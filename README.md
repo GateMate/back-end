@@ -1,6 +1,8 @@
 # Backend
 Back End Code for GateMate
 **Setting up and running flask app `server.py`**
+
+
 *Mac setup*
 ```
 export FLASK_APP=server.py
