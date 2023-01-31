@@ -12,7 +12,7 @@ db = firestore.client()
 
 
 #Creating and Testing
-testData = {"first_name":"Allie", "last_name":"Cortez","password":"1234","username":"al04"}
+testData = {"first_name":"Jose", "last_name":"Cortez","password":"1234","username":"al04"}
 doc_ref = db.collection('users').add(testData)
 
 

@@ -4,6 +4,10 @@ Back End Code for GateMate
 
 **Setting up and running flask app `server.py`**
 
+*Install Flask*
+`pip install flask`
+
+
 
 *Mac setup*
 ```
@@ -20,5 +24,13 @@ Power Shell
 ```
 env: FLASK_APP=server.py
 flask run
+```
+
+**Using Firebase SDK**
+```
+pip install firebase
+```
+
+
 
 
