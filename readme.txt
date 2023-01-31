@@ -1,0 +1,1 @@
+Link for tutorial I used: https://medium.com/firebase-developers/hosting-flask-servers-on-firebase-from-scratch-c97cfb204579 
