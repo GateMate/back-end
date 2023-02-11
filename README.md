@@ -1,6 +1,8 @@
 # Backend
 Back End Code for GateMate
 
+**Document for BE deployment**
+https://docs.google.com/document/d/1CWgG2g1wiA5k1Tz4hRaKBm5-Ao3NRvdIF6Ekp9HiOtY/edit?usp=sharing
 
 **Setting up and running flask app `server.py`**
 
