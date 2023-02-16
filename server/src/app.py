@@ -37,7 +37,7 @@ def create():
         id = request.json['id']
         todo_ref.document(id).set(request.json)
         print("help")
-        return jsonify({"success": True}), 200
+        return jsonify({"success": True}), 201
     except Exception as e:
         return f"An Error Occurred: {e}"
 
