@@ -16,7 +16,7 @@ https://docs.google.com/document/d/1CWgG2g1wiA5k1Tz4hRaKBm5-Ao3NRvdIF6Ekp9HiOtY/
 export FLASK_APP=server.py
 flask run
 ```
-*Potential Windows set up*?
+*Windows setup*
 Command Prompt
 ```
 set FLASK_APP=server.py
@@ -24,8 +24,7 @@ flask run
 ```
 Power Shell
 ```
-env: FLASK_APP=server.py
-flask run
+flask --app server.py run
 ```
 
 **Using Firebase SDK**
