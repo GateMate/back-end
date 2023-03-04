@@ -20,10 +20,24 @@ cred = credentials.Certificate('key.json')
 default_app = initialize_app(cred)
 db = firestore.client()
 todo_ref = db.collection('todos')
+usersCollection = db.collection('users')
 
 @app.route("/",methods = ['GET'])
 def start():
     return "server start"
+
+@app.route("/signup", methods =['GET','POST'])
+def signUp():
+    try:
+        newUserId = request.args.get('userID')
+        jsonEntry = {
+            'first_name': 'Jose',
+            'last_name':'Martinez'
+        }
+        usersCollection.document(newUserId).set(jsonEntry)
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return f"An Error Occurred: {e}"
 
 
 @app.route('/add', methods=['POST'])
