@@ -20,9 +20,13 @@ app = Flask(__name__)
 cred = credentials.Certificate('key.json')
 default_app = initialize_app(cred)
 db = firestore.client()
+
+#Initializing Collections
 todo_ref = db.collection('todos')
 fields = db.collection('fields_test')
 usersCollection = db.collection('users')
+gatesCollection = db.collection("gates_test")
+
 
 
 
@@ -87,7 +91,27 @@ def addField():
     except Exception as e:
         return f"An Error Occurred: {e}"
 
- 
+#sample request body
+# {
+#     "name": "my gate",
+#     "location": "50|50"
+# }
+@app.route("/addGate", methods =['GET','POST'])
+def addGates():
+    try:
+        gateName = request.get_json()["name"]
+        lat,lng = tuple([float (x) for x in request.get_json()["location"].split("|")])
+        geoPoint = GeoPoint(lat,lng)
+
+        jsonEntry = {
+            "user_id": db.document(currentUserReference).id,
+            "name": gateName,
+            "location": geoPoint
+        }
+        gatesCollection.document().set(jsonEntry)
+        return jsonify({"success": True})
+    except Exception as e:
+        return f"An Error Occurred: {e}"   
     
 @app.route('/add', methods=['POST'])
 def create():
