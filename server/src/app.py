@@ -5,6 +5,7 @@ import json
 from flask import Flask, request, jsonify
 from firebase_admin import credentials, firestore, initialize_app
 from google.cloud.firestore import GeoPoint
+from random import randrange
 import placement
 
 class NumpyEncoder(json.JSONEncoder):
@@ -26,10 +27,11 @@ todo_ref = db.collection('todos')
 fields = db.collection('fields_test')
 usersCollection = db.collection('users')
 gatesCollection = db.collection("gates_test")
+ivCollectiom = db.collection('rpi_gates')
 
 
 
-
+#the addField and addGate routes will not work until the user signs in(sign in route)
 @app.route("/",methods = ['GET'])
 def start():
      return jsonify({"success": True}), 200
@@ -41,7 +43,8 @@ def signUp():
         newUserId = request.get_json()['userID']
         jsonEntry = {
             'first_name': 'Jose',
-            'last_name':'Martinez'
+            'last_name':'Martinez',
+            'fields':[]
         }
         usersCollection.document(newUserId).set(jsonEntry)
         return jsonify({"success": True}), 200
@@ -78,14 +81,34 @@ def addField():
         lat,lng = (tuple([float(x) for x in request.get_json()['geopoint_4'].split("|")]))
         fourthGeopoint = GeoPoint(lat,lng)
 
+        lat,lng = tuple([float (x) for x in request.get_json()["gateLocation"].split("|")])
+        gateLocation = GeoPoint(lat,lng)
+
+        #fetchID for gate
+        gateID = randrange(50)
+        gateJson = {
+            "location":gateLocation
+        }
+        gatesCollection.document(str(gateID)).set(gateJson)
+
+
+
         docJsonEntry = {
             "user_id": db.document(currentUserReference).id,
             "field_name":'test_field',
             "first_point" : firstGeopoint,
             "second_point": secondGeopoint,
             "third_point": thirdGeopoint,
-            "fourth_point": fourthGeopoint
+            "fourth_point": fourthGeopoint,
+            "gates":[1,2,3]
+
         }
+
+
+        #getUser to update field ID
+
+
+
         fields.document().set(docJsonEntry)
         return jsonify({"success": True})
     except Exception as e:
@@ -99,10 +122,8 @@ def addField():
 @app.route("/addGate", methods =['GET','POST'])
 def addGates():
     try:
-        gateName = request.get_json()["name"]
-        lat,lng = tuple([float (x) for x in request.get_json()["location"].split("|")])
+        lat,lng = tuple([float (x) for x in request.get_json()["gateLocation"].split("|")])
         geoPoint = GeoPoint(lat,lng)
-
         jsonEntry = {
             "user_id": db.document(currentUserReference).id,
             "name": gateName,
@@ -111,8 +132,23 @@ def addGates():
         gatesCollection.document().set(jsonEntry)
         return jsonify({"success": True})
     except Exception as e:
-        return f"An Error Occurred: {e}"   
+        return f"An Error Occurred: {e}"
+
+#end point for retreving gates
+@app.route("/getGates",methods = ['GET','POST'])
+def fetchGates():
+    userFields = fields.where('user_id',u'==',str(db.document(currentUserReference).id)).get()
+
+
+    #right now hard coding this to the first field, later logic will be implemented to find the field id
+    gates = userFields[0].to_dict()["gates"]
+    jsonResponse = {
+        "gates":gates
+    }
+    return jsonResponse
     
+
+  
 @app.route('/add', methods=['POST'])
 def create():
     """
