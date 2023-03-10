@@ -81,18 +81,9 @@ def addField():
         lat,lng = (tuple([float(x) for x in request.get_json()['geopoint_4'].split("|")]))
         fourthGeopoint = GeoPoint(lat,lng)
 
-        lat,lng = tuple([float (x) for x in request.get_json()["gateLocation"].split("|")])
-        gateLocation = GeoPoint(lat,lng)
 
-        #fetchID for gate
-        gateID = randrange(50)
-        gateJson = {
-            "location":gateLocation
-        }
-        gatesCollection.document(str(gateID)).set(gateJson)
-
-
-
+        #creating fields and doc object to generate a fieldID
+        fieldEntry = fields.document()        
         docJsonEntry = {
             "user_id": db.document(currentUserReference).id,
             "field_name":'test_field',
@@ -100,52 +91,97 @@ def addField():
             "second_point": secondGeopoint,
             "third_point": thirdGeopoint,
             "fourth_point": fourthGeopoint,
-            "gates":[1,2,3]
-
+            "gates":[]
         }
+        fieldEntry.set(docJsonEntry)
+        
+        #adding fieldID to userColection
 
 
-        #getUser to update field ID
-
-
-
-        fields.document().set(docJsonEntry)
+        print("field_after",fieldEntry.get().id)
         return jsonify({"success": True})
     except Exception as e:
         return f"An Error Occurred: {e}"
 
+@app.route("/getFields",methods = ['GET','POST'])
+def getFields():
+    try:
+        userFields = fields.where('user_id',u'==',str(db.document(currentUserReference).id)).get()
+        jsonResponse ={}
+
+        for field in userFields:
+            doc = field.to_dict()
+            jsonResponse[field.id] = {
+                'first_geopoint':str(doc['first_point'].latitude) + "|" + str(doc['first_point'].longitude),
+                'second_point': str(doc['second_point'].latitude) + "|" + str(doc['second_point'].longitude),
+                'third_point': str(doc['third_point'].latitude) + "|" + str(doc['third_point'].longitude),
+                'fourth_point': str(doc['fourth_point'].latitude) + "|" + str(doc['fourth_point'].longitude),
+            }
+        return jsonResponse
+    except Exception as e:
+        return f"An Error Occurred: {e}"
+
+
+    
+
+
 #sample request body
 # {
-#     "name": "my gate",
+#     "field_id": "yWezzFDhrspN5lAf52Jo",
 #     "location": "50|50"
 # }
 @app.route("/addGate", methods =['GET','POST'])
 def addGates():
     try:
+        
         lat,lng = tuple([float (x) for x in request.get_json()["gateLocation"].split("|")])
-        geoPoint = GeoPoint(lat,lng)
-        jsonEntry = {
-            "user_id": db.document(currentUserReference).id,
-            "name": gateName,
-            "location": geoPoint
+        gateLocation = GeoPoint(lat,lng)
+
+        #fetchID for gate and height and persisting into gate collection
+        gateID = randrange(50)
+        gateHeight = randrange(10)
+        gateJson = {
+            "location":gateLocation,
+            "gate_height": 75
         }
-        gatesCollection.document().set(jsonEntry)
+        gatesCollection.document(str(gateID)).set(gateJson)
+
+
+        #updating fieldsCollection to add new gate
+        fieldID = request.get_json()["field_id"]
+        currentGates = fields.document(fieldID).get().to_dict()["gates"]
+        currentGates.append(gateID)
+        updatedFieldsDocument = {
+            "gates":currentGates
+        }
+        fields.document(fieldID).update(updatedFieldsDocument)
         return jsonify({"success": True})
+    
     except Exception as e:
         return f"An Error Occurred: {e}"
 
-#end point for retreving gates
+#end point for retreving gates - must take a fieldID
 @app.route("/getGates",methods = ['GET','POST'])
 def fetchGates():
-    userFields = fields.where('user_id',u'==',str(db.document(currentUserReference).id)).get()
+    try:
+        #getting field collection containg gates
+        fieldID = request.get_json()["field_id"]
+        field = fields.document(str(fieldID)).get().to_dict()
+        gateIDs = field["gates"]
+        jsonResponse = {}
 
 
-    #right now hard coding this to the first field, later logic will be implemented to find the field id
-    gates = userFields[0].to_dict()["gates"]
-    jsonResponse = {
-        "gates":gates
-    }
-    return jsonResponse
+        # #getting gates
+        for gate in gateIDs:
+            currentGate = gatesCollection.document(str(gate)).get().to_dict()
+            jsonResponse[gate] = {
+                "location": str(currentGate["location"].latitude) + "|"  + str(currentGate["location"].longitude),
+                "gate_height": currentGate["gate_height"]
+            }
+        
+        return jsonResponse
+    except Exception as e:
+        return f"An Error Occurred: {e}"
     
 
   
