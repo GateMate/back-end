@@ -27,7 +27,7 @@ todo_ref = db.collection('todos')
 fields = db.collection('fields_test')
 usersCollection = db.collection('users')
 gatesCollection = db.collection("gates_test")
-ivCollectiom = db.collection('rpi_gates')
+ivCollection = db.collection('rpi_gates')
 
 
 
@@ -144,17 +144,16 @@ def addGates():
             "location":gateLocation,
             "gate_height": 75
         }
-        gatesCollection.document(str(gateID)).set(gateJson)
-
-
-        #updating fieldsCollection to add new gate
-        fieldID = request.get_json()["field_id"]
-        currentGates = fields.document(fieldID).get().to_dict()["gates"]
-        currentGates.append(gateID)
-        updatedFieldsDocument = {
-            "gates":currentGates
-        }
-        fields.document(fieldID).update(updatedFieldsDocument)
+        ivCollection.document(str(gateID)).set(gateJson)
+   
+        # #updating fieldsCollection to add new gate
+        # fieldID = request.get_json()["field_id"]
+        # currentGates = fields.document(fieldID).get().to_dict()["gates"]
+        # currentGates.append(gateID)
+        # updatedFieldsDocument = {
+        #     "gates":currentGates
+        # }
+        # fields.document(fieldID).update(updatedFieldsDocument)
         return jsonify({"success": True})
     
     except Exception as e:
@@ -165,19 +164,27 @@ def addGates():
 def fetchGates():
     try:
         #getting field collection containg gates
-        fieldID = request.get_json()["field_id"]
-        field = fields.document(str(fieldID)).get().to_dict()
-        gateIDs = field["gates"]
+        # fieldID = request.get_json()["field_id"]
+        # field = fields.document(str(fieldID)).get().to_dict()
+        # gateIDs = field["gates"]
         jsonResponse = {}
 
-
-        # #getting gates
-        for gate in gateIDs:
-            currentGate = gatesCollection.document(str(gate)).get().to_dict()
-            jsonResponse[gate] = {
+        gates = ivCollection.stream()
+        for gate in gates:
+            currentGate = gate.to_dict()
+            jsonResponse[gate.id] = {
                 "location": str(currentGate["location"].latitude) + "|"  + str(currentGate["location"].longitude),
-                "gate_height": currentGate["gate_height"]
+                "gate_height": currentGate["gate_height"]          
             }
+
+
+        # # #getting gates
+        # for gate in gateIDs:
+        #     currentGate = gatesCollection.document(str(gate)).get().to_dict()
+        #     jsonResponse[gate] = {
+        #         "location": str(currentGate["location"].latitude) + "|"  + str(currentGate["location"].longitude),
+        #         "gate_height": currentGate["gate_height"]
+        #     }
         
         return jsonResponse
     except Exception as e:
