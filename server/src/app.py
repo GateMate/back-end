@@ -37,6 +37,7 @@ def start():
      return jsonify({"success": True}), 200
 
 
+
 @app.route("/signup", methods =['GET','POST'])
 def signUp():
     try:
@@ -130,22 +131,95 @@ def getFields():
 #     "field_id": "yWezzFDhrspN5lAf52Jo",
 #     "location": "50|50"
 # }
+
+@app.route("/editGate",methods =['GET','POST'])
+def editGate():
+    json = request.get_json()
+    global gates
+    gates = []
+    jsonResponse = {}
+    gates = ivCollection.stream()
+
+
+
+    for gate in gates:
+        currentGate = gate.to_dict()
+        if "node_id" not in currentGate.keys():
+
+            updatedFieldsDocument = {
+                "node_id":gates[0],
+                "location": str(currentGate["location"].latitude) + "|"  + str(currentGate["location"].longitude),
+                "gate_height": currentGate["gate_height"]          
+            }
+            ivCollection.document(gate.id).update(updatedFieldsDocument)
+
+
+
+@app.route("/setGateHeight", methods =['GET','POST'])
+def setGates():
+    json = request.get_json()
+
+    gateHeight = request.get_json()['height']
+    print(gateHeight)
+    gates = ivCollection.stream()
+    jsonResponse = {}
+
+    for gate in gates:
+        currentGate = gate.to_dict()
+        jsonResponse[gate.id] = {
+            "location": str(currentGate["location"].latitude) + "|"  + str(currentGate["location"].longitude),
+            "gate_height": currentGate["gate_height"],
+            "node_id": 0,       
+        }
+    return jsonResponse
+
+    # return jsonify({"success": True}), 200
+
+
+
+
+
+    # gates = ivCollection.stream()
+
+    # for gate in gates:
+    #     currentGate = gate.to_dict()
+    #     if "node_id" not in currentGate.keys():
+    #         updatedFieldsDocument = {
+    #             "node_id":gates[0],
+    #             "location": str(currentGate["location"].latitude) + "|"  + str(currentGate["location"].longitude),
+    #             "gate_height": currentGate["gate_height"]          
+    #         }
+    #         ivCollection.document(gate.id).update(updatedFieldsDocument)
+
+
+
+
+
+    # #loop through all gates in Database and add in Node_Ids from json. Account for mismatch sizes
+    # for gate in json.values():
+    #     gates.append(gate)
+
+    return json
+
+
 @app.route("/addGate", methods =['GET','POST'])
 def addGates():
     try:
         
         lat,lng = tuple([float (x) for x in request.get_json()["gateLocation"].split("|")])
         gateLocation = GeoPoint(lat,lng)
-
         #fetchID for gate and height and persisting into gate collection
         gateID = randrange(50)
+
         gateHeight = randrange(10)
         gateJson = {
             "location":gateLocation,
-            "gate_height": 75
+            "gate_height": 75,
+            "node_id":0
         }
         ivCollection.document(str(gateID)).set(gateJson)
-   
+
+        
         # #updating fieldsCollection to add new gate
         # fieldID = request.get_json()["field_id"]
         # currentGates = fields.document(fieldID).get().to_dict()["gates"]
@@ -169,15 +243,17 @@ def fetchGates():
         # gateIDs = field["gates"]
         jsonResponse = {}
 
+
         gates = ivCollection.stream()
+
         for gate in gates:
             currentGate = gate.to_dict()
             jsonResponse[gate.id] = {
                 "location": str(currentGate["location"].latitude) + "|"  + str(currentGate["location"].longitude),
-                "gate_height": currentGate["gate_height"]          
+                "gate_height": currentGate["gate_height"],
+                "node_id":0,         
             }
-
-
+        
         # # #getting gates
         # for gate in gateIDs:
         #     currentGate = gatesCollection.document(str(gate)).get().to_dict()
@@ -185,7 +261,7 @@ def fetchGates():
         #         "location": str(currentGate["location"].latitude) + "|"  + str(currentGate["location"].longitude),
         #         "gate_height": currentGate["gate_height"]
         #     }
-        
+        print('RESPONSE BEING RETURNED',jsonResponse)
         return jsonResponse
     except Exception as e:
         return f"An Error Occurred: {e}"
