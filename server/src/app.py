@@ -36,6 +36,21 @@ ivCollection = db.collection('rpi_gates')
 def start():
      return jsonify({"success": True}), 200
 
+@app.route("/updateNodeIds", methods = ["GET","POST"])
+def updateNodeId():
+    try:
+        jsonRequest = request.get_json()
+        gates = gatesCollection.stream()
+        for gate in gates:
+            currentGateId = gate.id
+            nodeID = jsonRequest[currentGateId]
+            updatedFieldsDocument ={
+                "node_id":nodeID,
+            }
+            gatesCollection.document(gate.id).update(updatedFieldsDocument)
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return f"An Error Occurred: {e}"
 
 
 @app.route("/signup", methods =['GET','POST'])
@@ -161,7 +176,7 @@ def setGates():
 
     gateHeight = request.get_json()['height']
     print(gateHeight)
-    gates = ivCollection.stream()
+    gates = gatesCollection.stream()
     jsonResponse = {}
 
     for gate in gates:
@@ -244,16 +259,17 @@ def fetchGates():
         jsonResponse = {}
 
 
-        gates = ivCollection.stream()
+        gates = gatesCollection.stream()
 
         for gate in gates:
             currentGate = gate.to_dict()
             jsonResponse[gate.id] = {
-                "location": str(currentGate["location"].latitude) + "|"  + str(currentGate["location"].longitude),
+                "lat": currentGate["lat"],
+                "long":currentGate["long"],
                 "gate_height": currentGate["gate_height"],
-                "node_id":0,         
+                "node_id":currentGate["node_id"],         
             }
-        
+
         # # #getting gates
         # for gate in gateIDs:
         #     currentGate = gatesCollection.document(str(gate)).get().to_dict()
