@@ -36,10 +36,13 @@ gatesCollection = db.collection("gates_test")
 def start():
      return jsonify({"success": True}), 200
 
-@app.route("/weather", methods = ['GET'])
-def getWeather():
-    requestWeather(36.082157, -94.171852)
-    return ({"success": True}), 200
+@app.route("/weather_forecast/<lat>/<long>", methods = ['GET'])
+def getWeather(lat = 0.0, long=0.0):
+    forecast_data = requestWeather(lat, long)#(36.082157, -94.171852)
+    forecast_hourly = forecast_data['hourly']
+    #print(forecast_hourly.keys())
+    #print(forecast_data['hourly'])
+    return jsonify({"precipitation_hourly": forecast_hourly['precipitation'], "timedate_hourly": forecast_hourly['time']}), 200
 
 @app.route("/signup", methods =['GET','POST'])
 def signUp():
