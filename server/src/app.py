@@ -40,14 +40,31 @@ def start():
 def updateNodeId():
     try:
         jsonRequest = request.get_json()
-        gates = gatesCollection.stream()
-        for gate in gates:
-            currentGateId = gate.id
-            nodeID = jsonRequest[currentGateId]
-            updatedFieldsDocument ={
-                "node_id":nodeID,
-            }
-            gatesCollection.document(gate.id).update(updatedFieldsDocument)
+        gates = set(jsonRequest.keys())
+        print(gates)
+        docs = db.collection(u'gates_test').stream() 
+
+        for doc in docs:
+            currentGateId = str(doc.id)
+            if currentGateId in gates:
+                nodeID = jsonRequest[currentGateId]
+                updatedFieldsDocument ={
+                    "node_id":nodeID,
+                }
+                gatesCollection.document(doc.id).update(updatedFieldsDocument)                
+        #for right now - retrevies all gates
+        # gates = gatesCollection.stream()
+        # print (gates)
+        # for gate in gates:
+        #     currentGateId = str(gate.id)
+        #     print(currentGateId)
+
+        #     if currentGateId in gates:
+        #         nodeID = jsonRequest[currentGateId]
+        #         updatedFieldsDocument ={
+        #             "node_id":nodeID,
+        #         }
+        #         gatesCollection.document(gate.id).update(updatedFieldsDocument)
         return jsonify({"success": True}), 200
     except Exception as e:
         return f"An Error Occurred: {e}"
@@ -82,26 +99,21 @@ def signIn():
 #     "geopoint_3": "30|70",
 #     "geopoint_4": "30|80"
 # }
+
+#GET - ID
+#POST - FIELD
 @app.route("/addField", methods =['GET','POST'])
 def addField():
     try:
-        lat,lng = (tuple([float(x) for x in request.get_json()['geopoint_1'].split("|")]))
-        firstGeopoint = GeoPoint(lat,lng)
-
-        lat,lng = (tuple([float(x) for x in request.get_json()['geopoint_2'].split("|")]))
-        secondGeopoint = GeoPoint(lat,lng)
-        
-        lat,lng = (tuple([float(x) for x in request.get_json()['geopoint_3'].split("|")]))
-        thirdGeopoint = GeoPoint(lat,lng)
-
-        lat,lng = (tuple([float(x) for x in request.get_json()['geopoint_4'].split("|")]))
-        fourthGeopoint = GeoPoint(lat,lng)
-
+        firstGeopoint = request.get_json()['geopoint_1']
+        secondGeopoint = request.get_json()['geopoint_2']
+        thirdGeopoint = request.get_json()['geopoint_3']
+        fourthGeopoint = request.get_json()['geopoint_4']
 
         #creating fields and doc object to generate a fieldID
         fieldEntry = fields.document()        
         docJsonEntry = {
-            "user_id": db.document(currentUserReference).id,
+            "user_id": 3,
             "field_name":'test_field',
             "first_point" : firstGeopoint,
             "second_point": secondGeopoint,
@@ -110,12 +122,7 @@ def addField():
             "gates":[]
         }
         fieldEntry.set(docJsonEntry)
-        
-        #adding fieldID to userColection
-
-
-        print("field_after",fieldEntry.get().id)
-        return jsonify({"success": True})
+        return jsonify({"success": fieldEntry.get().id})
     except Exception as e:
         return f"An Error Occurred: {e}"
 
@@ -168,8 +175,6 @@ def editGate():
             }
             ivCollection.document(gate.id).update(updatedFieldsDocument)
 
-
-
 @app.route("/setGateHeight", methods =['GET','POST'])
 def setGates():
     json = request.get_json()
@@ -221,30 +226,18 @@ def setGates():
 def addGates():
     try:
         
-        lat,lng = tuple([float (x) for x in request.get_json()["gateLocation"].split("|")])
-        gateLocation = GeoPoint(lat,lng)
-        #fetchID for gate and height and persisting into gate collection
-        gateID = randrange(50)
+        fieldID  = request.get_json()["field_id"]
+        gateLocation = request.get_json()["gateLocation"]
+        gateEntry = gatesCollection.document()        
 
-        gateHeight = randrange(10)
         gateJson = {
+            "field_id":fieldID,
             "location":gateLocation,
             "gate_height": 75,
-            "node_id":0
+            "node_id":-1
         }
-        ivCollection.document(str(gateID)).set(gateJson)
-
-        
-        # #updating fieldsCollection to add new gate
-        # fieldID = request.get_json()["field_id"]
-        # currentGates = fields.document(fieldID).get().to_dict()["gates"]
-        # currentGates.append(gateID)
-        # updatedFieldsDocument = {
-        #     "gates":currentGates
-        # }
-        # fields.document(fieldID).update(updatedFieldsDocument)
+        gateEntry.set(gateJson)
         return jsonify({"success": True})
-    
     except Exception as e:
         return f"An Error Occurred: {e}"
 
@@ -282,6 +275,17 @@ def fetchGates():
     except Exception as e:
         return f"An Error Occurred: {e}"
     
+@app.route('/getField', methods=['GET','POST'])
+def getField():
+    try:
+        gateID = request.get_json()["fieldID"]
+        jsonResponse = fields.document(gateID).get().to_dict()
+        return jsonResponse
+    except Exception as e:
+        return f"An Error Occurred: {e}"
+    
+
+
 
   
 @app.route('/add', methods=['POST'])
@@ -359,3 +363,14 @@ def placeGates():
 port = int(os.environ.get('PORT', 8080))
 if __name__ == '__main__':
     app.run(threaded=True, host='0.0.0.0', port=port)
+
+
+#end point -> 4 latitude points 
+
+
+
+#another route within a field
+#add another titles property into fields that 
+#1.title ID
+#2.4 verticies
+#3.relative height
