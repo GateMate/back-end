@@ -38,12 +38,14 @@ def start():
 
 @app.route("/weather_forecast/<lat>/<long>", methods = ['GET'])
 def getWeather(lat = 0.0, long=0.0):
-    forecast_data = requestWeather(lat, long)#(36.082157, -94.171852)
-    forecast_hourly = forecast_data['hourly']
-    #print(forecast_hourly.keys())
-    #print(forecast_data['hourly'])
-    return jsonify({"precipitation_hourly": forecast_hourly['precipitation'], "timedate_hourly": forecast_hourly['time']}), 200
-
+    try:
+        forecast_data = requestWeather(lat, long)#(36.082157, -94.171852)
+        forecast_hourly = forecast_data['hourly']
+        #print(forecast_hourly.keys())
+        #print(forecast_data['hourly'])
+        return jsonify({"precipitation_hourly": forecast_hourly['precipitation'], "timedate_hourly": forecast_hourly['time']}), 200
+    except:
+        return jsonify(({"error":"error occured with weather api"})), 500
 @app.route("/signup", methods =['GET','POST'])
 def signUp():
     try:

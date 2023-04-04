@@ -1,9 +1,6 @@
 import asyncio
 import requests
 
-from open_meteo import OpenMeteo
-from open_meteo.models import DailyParameters, HourlyParameters
-
 
 def requestWeather(latitude, longitude):
     locationArg = 'latitude='+str(latitude) + '&' + 'longitude='+str(longitude)
