@@ -114,20 +114,20 @@ def signIn():
 @app.route("/addField", methods =['GET','POST'])
 def addField():
     try:
-        firstGeopoint = request.get_json()['geopoint_1']
-        secondGeopoint = request.get_json()['geopoint_2']
-        thirdGeopoint = request.get_json()['geopoint_3']
-        fourthGeopoint = request.get_json()['geopoint_4']
+        firstGeopoint = request.get_json()['nw']
+        secondGeopoint = request.get_json()['ne']
+        thirdGeopoint = request.get_json()['sw']
+        fourthGeopoint = request.get_json()['se']
 
         #creating fields and doc object to generate a fieldID
         fieldEntry = fields.document()        
         docJsonEntry = {
             "user_id": 3,
             "field_name":'test_field',
-            "first_point" : firstGeopoint,
-            "second_point": secondGeopoint,
-            "third_point": thirdGeopoint,
-            "fourth_point": fourthGeopoint,
+            "nw_point" : firstGeopoint,
+            "ne_point": secondGeopoint,
+            "sw_point": thirdGeopoint,
+            "se_point": fourthGeopoint,
             "gates":[]
         }
         fieldEntry.set(docJsonEntry)
