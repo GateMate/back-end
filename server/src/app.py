@@ -421,8 +421,10 @@ def tileField():
     print("sorted heights = " + str(height_set))
 
     while (len(height_set) > MAX_HEIGHT_LEVELS):
-        height_set[0] = (height_set[0] + height_set[1]) / 2
-        height_set.remove(height_set[1])
+        first_val = height_set.pop()
+        sec_val = height_set.pop()
+
+        height_set.add((sec_val + first_val) / 2)
 
 	# build json response object of tiles
 
@@ -446,6 +448,8 @@ def tileField():
             else:
                 print("\033[1;34mO", end="")
         print("")
+
+    print("\033[0m\nEND OF TEST")
 
     return jsonify(tiles_dict)
   
