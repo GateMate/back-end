@@ -293,7 +293,7 @@ def getField():
     except Exception as e:
         return f"An Error Occurred: {e}"
 
-@app.route('/tile-field',methods=['GET'])
+@app.route('/tile-field',methods=['GET', 'POST'])
 def tileField():
 	# get the field boundaries using field_id and endpoint
 
