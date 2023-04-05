@@ -45,6 +45,24 @@ def closest(lst, K):
 def start():
      return jsonify({"success": True}), 200
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 @app.route("/updateNodeIds", methods = ["GET","POST"])
 def updateNodeId():
     try:
@@ -61,19 +79,7 @@ def updateNodeId():
                     "node_id":nodeID,
                 }
                 gatesCollection.document(doc.id).update(updatedFieldsDocument)                
-        #for right now - retrevies all gates
-        # gates = gatesCollection.stream()
-        # print (gates)
-        # for gate in gates:
-        #     currentGateId = str(gate.id)
-        #     print(currentGateId)
 
-        #     if currentGateId in gates:
-        #         nodeID = jsonRequest[currentGateId]
-        #         updatedFieldsDocument ={
-        #             "node_id":nodeID,
-        #         }
-        #         gatesCollection.document(gate.id).update(updatedFieldsDocument)
         return jsonify({"success": True}), 200
     except Exception as e:
         return f"An Error Occurred: {e}"
