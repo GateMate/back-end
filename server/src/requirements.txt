@@ -2,3 +2,6 @@
 flask
 firebase_admin
 numpy
+python_weather
+requests
+open-meteo

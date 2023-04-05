@@ -1,6 +1,7 @@
 # Required imports
 import os
 import numpy as np
+import asyncio
 import json
 import requests
 from flask import Flask, request, jsonify
@@ -8,12 +9,6 @@ from firebase_admin import credentials, firestore, initialize_app
 from google.cloud.firestore import GeoPoint
 from random import randrange
 import placement
-
-TILES_PER_FIELD_X = 8
-TILES_PER_FIELD_Y = 8
-MAX_HEIGHT_LEVELS = 4
-
-ELEVATION_ENDPOINT = "http://34.174.221.76"
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -45,7 +40,16 @@ def closest(lst, K):
 def start():
      return jsonify({"success": True}), 200
 
-
+@app.route("/weather_forecast/<lat>/<long>", methods = ['GET'])
+def getWeather(lat = 0.0, long=0.0):
+    try:
+        forecast_data = requestWeather(lat, long)#(36.082157, -94.171852)
+        forecast_hourly = forecast_data['hourly']
+        #print(forecast_hourly.keys())
+        #print(forecast_data['hourly'])
+        return jsonify({"precipitation_hourly": forecast_hourly['precipitation'], "timedate_hourly": forecast_hourly['time']}), 200
+    except:
+        return jsonify(({"error":"error occured with weather api"})), 500
 
 
 
@@ -130,38 +134,15 @@ def addField():
         docJsonEntry = {
             "user_id": 3,
             "field_name":'test_field',
-            "nw_point" : firstGeopoint,
-            "ne_point": secondGeopoint,
-            "sw_point": thirdGeopoint,
-            "se_point": fourthGeopoint,
-            "gates":[]
+            "first_point" : firstGeopoint,
+            "second_point": secondGeopoint,
+            "third_point": thirdGeopoint,
+            "fourth_point": fourthGeopoint
         }
-        fieldEntry.set(docJsonEntry)
-        return jsonify({"success": fieldEntry.get().id})
+        fields.document().set(docJsonEntry)
+        return jsonify({"success": True})
     except Exception as e:
         return f"An Error Occurred: {e}"
-
-@app.route("/getFields",methods = ['GET','POST'])
-def getFields():
-    try:
-        userFields = fields.where('user_id',u'==',str(db.document(currentUserReference).id)).get()
-        jsonResponse ={}
-
-        for field in userFields:
-            doc = field.to_dict()
-            jsonResponse[field.id] = {
-                'first_geopoint':str(doc['first_point'].latitude) + "|" + str(doc['first_point'].longitude),
-                'second_point': str(doc['second_point'].latitude) + "|" + str(doc['second_point'].longitude),
-                'third_point': str(doc['third_point'].latitude) + "|" + str(doc['third_point'].longitude),
-                'fourth_point': str(doc['fourth_point'].latitude) + "|" + str(doc['fourth_point'].longitude),
-            }
-        return jsonResponse
-    except Exception as e:
-        return f"An Error Occurred: {e}"
-
-
-    
-
 
 #sample request body
 # {
@@ -240,16 +221,14 @@ def setGates():
 @app.route("/addGate", methods =['GET','POST'])
 def addGates():
     try:
-        
-        fieldID  = request.get_json()["field_id"]
-        gateLocation = request.get_json()["gateLocation"]
-        gateEntry = gatesCollection.document()        
+        gateName = request.get_json()["name"]
+        lat,lng = tuple([float (x) for x in request.get_json()["location"].split("|")])
+        geoPoint = GeoPoint(lat,lng)
 
-        gateJson = {
-            "field_id":fieldID,
-            "location":gateLocation,
-            "gate_height": 75,
-            "node_id":-1
+        jsonEntry = {
+            "user_id": db.document(currentUserReference).id,
+            "name": gateName,
+            "location": geoPoint
         }
         gateEntry.set(gateJson)
         return jsonify({"success": True})
