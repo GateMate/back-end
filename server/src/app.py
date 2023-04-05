@@ -416,10 +416,6 @@ def tileField():
 
     print("height set = ", str(height_set))
 
-    height_set: set = set(sorted(height_set))
-
-    print("sorted heights = " + str(height_set))
-
     while (len(height_set) > MAX_HEIGHT_LEVELS):
         first_val = height_set.pop()
         sec_val = height_set.pop()
