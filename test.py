@@ -24,7 +24,7 @@ print("GOT RESPONSE!")
 
 tiles_dict = {}
 
-if (response.status_code == 200):
+if (response.ok):
     data = {}
     data = response.json()
 
