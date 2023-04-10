@@ -64,7 +64,7 @@ def getWeather(lat = 0.0, long=0.0):
         forecast_data = requestWeather(lat, long)#(36.082157, -94.171852)
         forecast_hourly = forecast_data['hourly']
         #print(forecast_hourly.keys())
-        #print(forecast_data['hourly'])
+        #print(forecast_data['hourly']) 
         return jsonify({"precipitation_hourly": forecast_hourly['precipitation'], "timedate_hourly": forecast_hourly['time']}), 200
     except:
         return jsonify(({"error":"error occured with weather api"})), 500
@@ -118,12 +118,12 @@ def signIn():
     return jsonify({"success": True}), 200
 
 #sample requestBody
-# {
-#     "nw":"36.0627|-94.1606",
-#     "ne": "36.0628|-94.1606",
-#     "sw": "36.0628|-94.1605",
-#     "se": "36.0627|-94.1605"
-# }
+{
+    "nw":"36.0627|-94.1606",
+    "ne": "36.0628|-94.1606",
+    "sw": "36.0628|-94.1605",
+    "se": "36.0627|-94.1605"
+}
 @app.route("/addField", methods =['GET','POST'])
 def addField():
     try:
@@ -137,16 +137,17 @@ def addField():
         docJsonEntry = {
             "user_id": 3,
             "field_name":'test_field',
-            "first_point" : firstGeopoint,
-            "second_point": secondGeopoint,
-            "third_point": thirdGeopoint,
-            "fourth_point": fourthGeopoint
+            "nw_point" : firstGeopoint,
+            "ne_point": secondGeopoint,
+            "sw_point": thirdGeopoint,
+            "se_point": fourthGeopoint
         }
         fieldEntry.set(docJsonEntry)
         fieldID = fieldEntry.id
         return jsonify({"success": fieldID})
     except Exception as e:
         return f"An Error Occurred: {e}"
+
 
 #sample request
 # {
@@ -256,6 +257,7 @@ def tileField():
     try:
         gateID = request.get_json()["fieldID"]
         jsonResponse = fields.document(gateID).get().to_dict()
+        print("JSON",jsonResponse)
         current_field = jsonResponse.copy()
     except Exception as e:
         return f"An Error Occurred: {e}"
