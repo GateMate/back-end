@@ -47,8 +47,6 @@ ELEVATION_ENDPOINT = "http://34.174.221.76"
 def closest(lst, K):
     return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
 
-
-
 def updateFieldDocument(fieldID,gateID):
     try:
         fieldDocument = fields.document(fieldID)
@@ -57,6 +55,12 @@ def updateFieldDocument(fieldID,gateID):
         return jsonResponse
     except Exception as e:
         return f"An Error Occurred: {e}"
+
+def getActiveUser():
+    activeUser = usersCollection.where(u'activeUser', u'==', u'true').get()
+    print("activeUser",type(activeUser))
+    return activeUser
+
 
 #the addField and addGate routes will not work until the user signs in(sign in route)
 @app.route("/",methods = ['GET'])
@@ -119,6 +123,7 @@ def signUp():
         jsonEntry = {
             'first_name': 'Jose',
             'last_name':'Martinez',
+            'activeUser':'false',
             'fields':[],
             'todos':[]
         }
@@ -131,24 +136,34 @@ def signUp():
 def signIn():
     # global currentUserReference
     currentUser = request.get_json()['userID']
-    currentUserReference = f"users/'{currentUser}'"
+    activeUser = {
+        "activeUser":"true"
+    }
+    usersCollection.document(currentUser).update(activeUser)
     print("currentUser",currentUserReference)
     return jsonify({"success": True}), 200
 
 @app.route("/signout",methods = ['GET','POST'])
 def signout():
-    print("current user signing out",currentUserReference)
-    currentUserReference = None
+    try:
+        userID = request.get_json()['userID']
+        jsonEntry = {
+            "activeUser":'false'
+        }
+        usersCollection.document(userID).update(jsonEntry)
+        return jsonify({"success":True}),200
+    except Exception as e:
+        return f"An Error Occurred: {e}"
 
 
 
 #sample requestBody
-{
-    "nw":"36.0627|-94.1606",
-    "ne": "36.0628|-94.1606",
-    "sw": "36.0628|-94.1605",
-    "se": "36.0627|-94.1605"
-}
+# {
+#     "nw":"36.0627|-94.1606",
+#     "ne": "36.0628|-94.1606",
+#     "sw": "36.0628|-94.1605",
+#     "se": "36.0627|-94.1605"
+# }
 @app.route("/addField", methods =['GET','POST'])
 def addField():
     try:
@@ -430,7 +445,9 @@ def tileField():
 
     return jsonify(tiles_dict)
 
-
+def updateUser(user_id,todo_id):
+    usersDocument = usersCollection.document(user_id)
+    usersDocument.update({u'todos': firestore.ArrayUnion([str(todo_id)])})
 
 @app.route('/add', methods=['POST'])
 def create():
@@ -439,16 +456,25 @@ def create():
         Ensure you pass a custom ID as part of json body in post request,
         e.g. json={'id': '1', 'title': 'Write a blog post,}
     """
-    if currentUserReference:
-        try:
-            id = request.json['id']
-            todo_ref.document(id).set(request.json)
-            print("help")
-            return jsonify({"success": True}), 201
-        except Exception as e:
-            return f"An Error Occurred: {e}"
+    currentUser = getActiveUser()
+    if (len(currentUser) == 0):
+        return f"Not signed in"  
     else:
-        return f"Not signed in"
+        try:
+            userID = currentUser[0].id
+            newToDo = todo_ref.document()
+            newToDo.set(request.json)
+            updateUser(userID,newToDo.id)
+            print("help")
+            return jsonify({"success": True})
+        except Exception as e:
+            print(e)
+            return f"An Error Occurred: {e}"
+
+
+
+
+
     
 # @app.route("/addField", methods =['GET','POST'])
 # def addField():
@@ -484,10 +510,14 @@ def read():
         todo : Return document that matches query ID.
         all_todos : Return all documents.
     """
-    if (currentUserReference):
+    currentUser = getActiveUser()
+    if (len(currentUser) == 0):
+        return f"Not signed in" 
+    else: 
         try:
             # Check if ID was passed to URL query
             todo_id = request.args.get('id')
+            print("toDo",todo_id)
             if todo_id:
                 todo = todo_ref.document(todo_id).get()
                 return jsonify(todo.to_dict()), 200
@@ -496,10 +526,6 @@ def read():
                 return jsonify(all_todos), 200
         except Exception as e:
             return f"An Error Occurred: {e}"
-    else:
-        return f"Not signed in"
-
-
 
 @app.route('/update', methods=['POST', 'PUT'])
 def update():
