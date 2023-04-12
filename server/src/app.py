@@ -70,7 +70,13 @@ def getWeather(lat = 0.0, long=0.0):
         forecast_hourly = forecast_data['hourly']
         #print(forecast_hourly.keys())
         #print(forecast_data['hourly']) 
-        return jsonify({"precipitation_hourly": forecast_hourly['precipitation'], "timedate_hourly": forecast_hourly['time']}), 200
+        totalPrecipitation = 0.0
+        significantRain = False
+        for precipitation in forecast_hourly['precipitation']:
+            totalPrecipitation += precipitation
+        if totalPrecipitation > 1.0 :
+            significantRain = True
+        return jsonify({"significant_precipitation": significantRain, "precipitation_hourly": forecast_hourly['precipitation'], "timedate_hourly": forecast_hourly['time']}), 200
     except:
         return jsonify(({"error":"error occured with weather api"})), 500
 
