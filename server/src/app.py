@@ -5,7 +5,7 @@ import asyncio
 import json
 import requests
 from flask import Flask, request, jsonify
-from firebase_admin import credentials, firestore, initialize_app
+from firebase_admin import credentials, firestore, initialize_app, auth, _auth_utils
 from google.cloud.firestore import GeoPoint
 from weather_api import requestWeather
 
@@ -47,7 +47,19 @@ ELEVATION_ENDPOINT = "http://34.174.221.76"
 def closest(lst, K):
     return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
 
+def check_auth(token: str):
+    try:
+        decoded_token = auth.verify_id_token(token)
+        uid = decoded_token['uid']
 
+        print("Decoded token = ", end="")
+        print(decoded_token)
+
+        return True, uid
+    except _auth_utils.InvalidIdTokenError:
+        print("INVALID ID TOKEN")
+
+        return False, ""
 
 def updateFieldDocument(fieldID,gateID):
     try:
@@ -65,14 +77,19 @@ def start():
 
 @app.route("/weather_forecast/<lat>/<long>", methods = ['GET'])
 def getWeather(lat = 0.0, long=0.0):
-    try:
-        forecast_data = requestWeather(lat, long)#(36.082157, -94.171852)
-        forecast_hourly = forecast_data['hourly']
-        #print(forecast_hourly.keys())
-        #print(forecast_data['hourly']) 
-        return jsonify({"precipitation_hourly": forecast_hourly['precipitation'], "timedate_hourly": forecast_hourly['time']}), 200
-    except:
-        return jsonify(({"error":"error occured with weather api"})), 500
+    auth_token = request.get_json()["auth_token"]
+
+    if (check_auth(auth_token)[0]):
+        try:
+            forecast_data = requestWeather(lat, long)#(36.082157, -94.171852)
+            forecast_hourly = forecast_data['hourly']
+            #print(forecast_hourly.keys())
+            #print(forecast_data['hourly']) 
+            return jsonify({"precipitation_hourly": forecast_hourly['precipitation'], "timedate_hourly": forecast_hourly['time']}), 200
+        except:
+            return jsonify(({"error":"error occured with weather api"})), 500
+    else:
+        return ("FORBIDDEN", 403)
 
 
 # sampleRequestBody - key:gateID value:newNodeId
@@ -81,32 +98,42 @@ def getWeather(lat = 0.0, long=0.0):
 # }
 @app.route("/updateNodeIds", methods = ["GET","POST"])
 def updateNodeId():
-    try:
-        jsonRequest = request.get_json()
-        gates = set(jsonRequest.keys())
-        docs = db.collection(u'gates').stream()
-        print(gates)
+    auth_token = request.get_json()["auth_token"]
 
-        for doc in docs:
-            currentGateId = str(doc.id)
-            if currentGateId in gates:
-                nodeID = jsonRequest[currentGateId]
-                updatedFieldsDocument ={
-                    "nodeID":nodeID,
-                }
-                realGatesCollection.document(doc.id).update(updatedFieldsDocument)                
-        return jsonify({"success": True}), 200
-    except Exception as e:
-        return f"An Error Occurred: {e}"
+    if (check_auth(auth_token)[0]):
+        try:
+            jsonRequest = request.get_json()
+            gates = set(jsonRequest.keys())
+            docs = db.collection(u'gates').stream()
+            print(gates)
+
+            for doc in docs:
+                currentGateId = str(doc.id)
+                if currentGateId in gates:
+                    nodeID = jsonRequest[currentGateId]
+                    updatedFieldsDocument ={
+                        "nodeID":nodeID,
+                    }
+                    realGatesCollection.document(doc.id).update(updatedFieldsDocument)                
+            return jsonify({"success": True}), 200
+        except Exception as e:
+            return f"An Error Occurred: {e}"
+    else:
+        return ("FORBIDDEN", 403)
 
 @app.route("/deleteField",methods = ['GET','POST'])
 def deleteField():
-    try:
-        fieldID = request.get_json()['fieldID']
-        fields.document(fieldID).delete()
-        return jsonify({"success": True}), 200
-    except Exception as e:
-        return f"An Error Occurred : {e}"
+    auth_token = request.get_json()["auth_token"]
+
+    if (check_auth(auth_token)[0]):
+        try:
+            fieldID = request.get_json()['fieldID']
+            fields.document(fieldID).delete()
+            return jsonify({"success": True}), 200
+        except Exception as e:
+            return f"An Error Occurred : {e}"
+    else:
+        return ("FORBIDDEN", 403)
 
 #sample request
 # {
@@ -140,8 +167,6 @@ def signout():
     print("current user signing out",currentUserReference)
     currentUserReference = None
 
-
-
 #sample requestBody
 {
     "nw":"36.0627|-94.1606",
@@ -151,28 +176,33 @@ def signout():
 }
 @app.route("/addField", methods =['GET','POST'])
 def addField():
-    try:
-        firstGeopoint = request.get_json()['nw']
-        secondGeopoint = request.get_json()['ne']
-        thirdGeopoint = request.get_json()['sw']
-        fourthGeopoint = request.get_json()['se']
+    auth_token = request.get_json()["auth_token"]
 
-        #creating fields and doc object to generate a fieldID
-        fieldEntry = fields.document()        
-        docJsonEntry = {
-            "user_id": 3,
-            "field_name":'test_field',
-            "nw_point" : firstGeopoint,
-            "ne_point": secondGeopoint,
-            "sw_point": thirdGeopoint,
-            "se_point": fourthGeopoint,
-            "gates": []
-        }
-        fieldEntry.set(docJsonEntry)
-        fieldID = fieldEntry.id
-        return jsonify({"success": fieldID})
-    except Exception as e:
-        return f"An Error Occurred: {e}"
+    if (check_auth(auth_token)[0]):
+        try:
+            firstGeopoint = request.get_json()['nw']
+            secondGeopoint = request.get_json()['ne']
+            thirdGeopoint = request.get_json()['sw']
+            fourthGeopoint = request.get_json()['se']
+
+            #creating fields and doc object to generate a fieldID
+            fieldEntry = fields.document()        
+            docJsonEntry = {
+                "user_id": 3,
+                "field_name":'test_field',
+                "nw_point" : firstGeopoint,
+                "ne_point": secondGeopoint,
+                "sw_point": thirdGeopoint,
+                "se_point": fourthGeopoint,
+                "gates": []
+            }
+            fieldEntry.set(docJsonEntry)
+            fieldID = fieldEntry.id
+            return jsonify({"success": fieldID})
+        except Exception as e:
+            return f"An Error Occurred: {e}"
+    else:
+        return ("FORBIDDEN", 403)
 
 
 #sample request
@@ -182,16 +212,22 @@ def addField():
 # }
 @app.route("/setGateHeight", methods =['GET','POST'])
 def setGateHeight():
-    try:
-        gateHeight = request.get_json()['height']
-        gateID = request.get_json()['gateID']
 
-        updatedGateDocument = {"height":gateHeight}
-        realGatesCollection.document(gateID).update(updatedGateDocument)
+    auth_token = request.get_json()["auth_token"]
 
-        return jsonify({"success": True}), 200
-    except Exception as e:
-        return f"An Error Occurred: {e}"
+    if (check_auth(auth_token)[0]):
+        try:
+            gateHeight = request.get_json()['height']
+            gateID = request.get_json()['gateID']
+
+            updatedGateDocument = {"height":gateHeight}
+            realGatesCollection.document(gateID).update(updatedGateDocument)
+
+            return jsonify({"success": True}), 200
+        except Exception as e:
+            return f"An Error Occurred: {e}"
+    else:
+        return ("FORBIDDEN", 403)
 
 #sample request body - when we have fieldID
 
@@ -205,52 +241,71 @@ def setGateHeight():
 # }
 @app.route("/addGate", methods =['GET','POST'])
 def addGates():
-    try:
-        gateEntry = realGatesCollection.document()
 
-        lat,long = tuple(request.get_json()["gateLocation"].split("|"))
-        fieldID = request.get_json()["fieldID"]
+    auth_token = request.get_json()["auth_token"]
 
-        gateJson = {
-            "lat": lat,
-            "long":long,
-            "nodeID":0,
-            "height":20
-        }
-        gateEntry.set(gateJson)
-        createdGateID = gateEntry.id
-        #will be implemented later to link field and gate
-        updateFieldDocument(fieldID,createdGateID)
-        return jsonify({"success": True})
-    except Exception as e:
-        return f"An Error Occurred: {e}"
+    if (check_auth(auth_token)[0]):
+        try:
+            gateEntry = realGatesCollection.document()
+
+            lat,long = tuple(request.get_json()["gateLocation"].split("|"))
+            fieldID = request.get_json()["fieldID"]
+
+            gateJson = {
+                "lat": lat,
+                "long":long,
+                "nodeID":0,
+                "height":20
+            }
+            gateEntry.set(gateJson)
+            createdGateID = gateEntry.id
+            #will be implemented later to link field and gate
+            updateFieldDocument(fieldID,createdGateID)
+            return jsonify({"success": True})
+        except Exception as e:
+            return f"An Error Occurred: {e}"
+    else:   
+        return ("FORBIDDEN", 403)
 
 @app.route("/getGates",methods = ['GET','POST'])
 def fetchGates():
-    try:
-        jsonResponse = {}
 
-        gates = realGatesCollection.stream()
-        for gate in gates:
-            currentGate = gate.to_dict()
-            jsonResponse[gate.id] = {
-                "lat": currentGate["lat"],
-                "long":currentGate["long"],
-                "height": currentGate["height"],
-                "nodeID":currentGate["nodeID"]         
-            }
-        return jsonResponse
-    except Exception as e:
-        return f"An Error Occurred: {e}"
+    auth_token = request.get_json()["auth_token"]
+
+    if (check_auth(auth_token)[0]):
+        try:
+            jsonResponse = {}
+
+            gates = realGatesCollection.stream()
+            for gate in gates:
+                currentGate = gate.to_dict()
+                jsonResponse[gate.id] = {
+                    "lat": currentGate["lat"],
+                    "long":currentGate["long"],
+                    "height": currentGate["height"],
+                    "nodeID":currentGate["nodeID"]         
+                }
+            return jsonResponse
+        except Exception as e:
+            return f"An Error Occurred: {e}"
+    else:
+        return ("FORBIDDEN", 403)
     
 @app.route('/getField', methods=['GET','POST'])
 def getField():
-    try:
-        gateID = request.get_json()["fieldID"]
-        jsonResponse = fields.document(gateID).get().to_dict()
-        return jsonResponse
-    except Exception as e:
-        return f"An Error Occurred: {e}"
+
+    auth_token = request.get_json()["auth_token"]
+
+    if (check_auth(auth_token)[0]):
+
+        try:
+            gateID = request.get_json()["fieldID"]
+            jsonResponse = fields.document(gateID).get().to_dict()
+            return jsonResponse
+        except Exception as e:
+            return f"An Error Occurred: {e}"
+    else:
+        return ("FORBIDDEN", 403) 
 
 #sample request body
 # {
@@ -259,17 +314,24 @@ def getField():
 # }
 @app.route('/adjustGateLocation', methods=['GET','POST'])
 def adjustGateLocation():
-    try:
-        lat,long = tuple(request.get_json()["location"].split("|"))
-        gateID = request.get_json()['gateID']
-        updatedGateDocument = {
-            "lat":lat,
-            "long":long
-        }
-        realGatesCollection.document(gateID).update(updatedGateDocument)        
-        return jsonify({"success": True})
-    except Exception as e:
-        return f"An Error Occurred: {e}"
+
+    auth_token = request.get_json()["auth_token"]
+
+    if (check_auth(auth_token)[0]):
+        try:
+            lat,long = tuple(request.get_json()["location"].split("|"))
+            gateID = request.get_json()['gateID']
+            updatedGateDocument = {
+                "lat":lat,
+                "long":long
+            }
+            realGatesCollection.document(gateID).update(updatedGateDocument)        
+            return jsonify({"success": True})
+        except Exception as e:
+            return f"An Error Occurred: {e}"
+    
+    else:
+        return ("FORBIDDEN", 403)
 
 #sample request
 # {
@@ -278,159 +340,164 @@ def adjustGateLocation():
 @app.route('/tile-field',methods=['GET', 'POST'])
 def tileField():
 
-    current_field = {}
-    try:
-        gateID = request.get_json()["fieldID"]
-        jsonResponse = fields.document(gateID).get().to_dict()
-        print("JSON",jsonResponse)
-        current_field = jsonResponse.copy()
-    except Exception as e:
-        return f"An Error Occurred: {e}"
-    
-    test_field : dict[str, str] = {
-        'sw_point': "36.0627|-94.1606",
-        'nw_point': "36.0628|-94.1606",
-        'ne_point': "36.0628|-94.1605",
-        'se_point': "36.0627|-94.1605"
-    }
+    auth_token = request.get_json()["auth_token"]
 
-    ########################
+    if (check_auth(auth_token)[0]):
 
-    #current_field : dict[str, str] = test_field.copy()
-
-    trans_field : dict[str: [str, float]] = {
-        "sw_point" : {
-            "lat" : float(current_field["sw_point"].split('|')[0]),
-            "long" : float(current_field["sw_point"].split('|')[1])
-        }, 
-        "nw_point" : {
-            "lat" : float(current_field["nw_point"].split('|')[0]),
-            "long" : float(current_field["nw_point"].split('|')[1])
-        }, 
-        "se_point" : {
-            "lat" : float(current_field["se_point"].split('|')[0]),
-            "long" : float(current_field["se_point"].split('|')[1])
-        }, 
-        "ne_point" : {
-            "lat" : float(current_field["ne_point"].split('|')[0]),
-            "long" : float(current_field["ne_point"].split('|')[1])
-        }
-    } 
-    
-    print(trans_field)
-	
-	# tile the field and get the width and height of each tile
-
-    n_dist = abs(trans_field["ne_point"]["long"] - trans_field["nw_point"]["long"])
-    s_dist = abs(trans_field["se_point"]["long"] - trans_field["sw_point"]["long"])
-    e_dist = abs(trans_field["se_point"]["lat"] - trans_field["ne_point"]["lat"])
-    w_dist = abs(trans_field["sw_point"]["lat"] - trans_field["nw_point"]["lat"])
-
-    print("n_dist = " + str(n_dist))
-    print("s_dist = " + str(s_dist))
-    print("w_dist = " + str(w_dist))
-    print("e_dist = " + str(e_dist))
-
-    tile_width = ((n_dist + s_dist) / 2) / TILES_PER_FIELD_X
-    tile_height = ((e_dist + w_dist) / 2) / TILES_PER_FIELD_Y
-
-    print("tile_widt = " + str(tile_width))
-    print("tile_height = " + str(tile_height))
-
-    print("BELOW THIS IS THE TILES_DICT \n")
-
-    tiles_dict: dict[int: [str, str]] = {}
-
-    for i in range(TILES_PER_FIELD_Y):
-        for j in range(TILES_PER_FIELD_X):
-            tile_dict = {}
-
-            tile_dict["sw_point"] = str(trans_field["sw_point"]["lat"] + i*tile_height) + \
-            "|" + \
-            str(trans_field["sw_point"]["long"] + (j*tile_width))
-
-            tile_dict["nw_point"] = str(trans_field["sw_point"]["lat"] + (i*tile_height + tile_height)) + \
-            "|" + \
-            str(trans_field["sw_point"]["long"] + (j*tile_width))
-
-            tile_dict["se_point"] = str(trans_field["sw_point"]["lat"] + (i*tile_height)) + \
-            "|" + \
-            str(trans_field["sw_point"]["long"] + (j*tile_width + tile_width))
-
-            tile_dict["ne_point"] = str(trans_field["sw_point"]["lat"] + (i*tile_height + tile_height)) + \
-            "|" + \
-            str(trans_field["sw_point"]["long"] + (j*tile_width + tile_width))
-            
-            tiles_dict[i*TILES_PER_FIELD_X + j] = tile_dict
-
-    print(tiles_dict)
-
-    # go get heights of every tile in dict and add to tiles_dict
-
-    for i in range(TILES_PER_FIELD_X * TILES_PER_FIELD_Y):
+        current_field = {}
+        try:
+            gateID = request.get_json()["fieldID"]
+            jsonResponse = fields.document(gateID).get().to_dict()
+            print("JSON",jsonResponse)
+            current_field = jsonResponse.copy()
+        except Exception as e:
+            return f"An Error Occurred: {e}"
         
-        url = ELEVATION_ENDPOINT + "/api/v1/lookup?locations=" + \
-        tiles_dict[i]["sw_point"].split('|')[0] + "," + \
-        tiles_dict[i]["sw_point"].split('|')[1]
+        test_field : dict[str, str] = {
+            'sw_point': "36.0627|-94.1606",
+            'nw_point': "36.0628|-94.1606",
+            'ne_point': "36.0628|-94.1605",
+            'se_point': "36.0627|-94.1605"
+        }
 
-        print("url_test = " + url)
+        ########################
 
-        response = requests.get(url)
+        #current_field : dict[str, str] = test_field.copy()
 
-        if (response.status_code == 200):
-            data = {}
-            data = response.json()
+        trans_field : dict[str: [str, float]] = {
+            "sw_point" : {
+                "lat" : float(current_field["sw_point"].split('|')[0]),
+                "long" : float(current_field["sw_point"].split('|')[1])
+            }, 
+            "nw_point" : {
+                "lat" : float(current_field["nw_point"].split('|')[0]),
+                "long" : float(current_field["nw_point"].split('|')[1])
+            }, 
+            "se_point" : {
+                "lat" : float(current_field["se_point"].split('|')[0]),
+                "long" : float(current_field["se_point"].split('|')[1])
+            }, 
+            "ne_point" : {
+                "lat" : float(current_field["ne_point"].split('|')[0]),
+                "long" : float(current_field["ne_point"].split('|')[1])
+            }
+        } 
+        
+        print(trans_field)
+        
+        # tile the field and get the width and height of each tile
 
-            print(data)
+        n_dist = abs(trans_field["ne_point"]["long"] - trans_field["nw_point"]["long"])
+        s_dist = abs(trans_field["se_point"]["long"] - trans_field["sw_point"]["long"])
+        e_dist = abs(trans_field["se_point"]["lat"] - trans_field["ne_point"]["lat"])
+        w_dist = abs(trans_field["sw_point"]["lat"] - trans_field["nw_point"]["lat"])
 
-            tiles_dict[i]["elevation"] = data['results'][0]['elevation']
+        print("n_dist = " + str(n_dist))
+        print("s_dist = " + str(s_dist))
+        print("w_dist = " + str(w_dist))
+        print("e_dist = " + str(e_dist))
 
-    print("tiles post elevation... \n")
-    print(tiles_dict)
+        tile_width = ((n_dist + s_dist) / 2) / TILES_PER_FIELD_X
+        tile_height = ((e_dist + w_dist) / 2) / TILES_PER_FIELD_Y
 
-    # normalize heights
+        print("tile_widt = " + str(tile_width))
+        print("tile_height = " + str(tile_height))
 
-    height_set : set = set([])
+        print("BELOW THIS IS THE TILES_DICT \n")
 
-    for tile in tiles_dict:
-        height_set.add(tiles_dict[tile]["elevation"])
+        tiles_dict: dict[int: [str, str]] = {}
 
-    print("height set = ", str(height_set))
+        for i in range(TILES_PER_FIELD_Y):
+            for j in range(TILES_PER_FIELD_X):
+                tile_dict = {}
 
-    while (len(height_set) > MAX_HEIGHT_LEVELS):
-        first_val = height_set.pop()
-        sec_val = height_set.pop()
+                tile_dict["sw_point"] = str(trans_field["sw_point"]["lat"] + i*tile_height) + \
+                "|" + \
+                str(trans_field["sw_point"]["long"] + (j*tile_width))
 
-        height_set.add((sec_val + first_val) / 2)
+                tile_dict["nw_point"] = str(trans_field["sw_point"]["lat"] + (i*tile_height + tile_height)) + \
+                "|" + \
+                str(trans_field["sw_point"]["long"] + (j*tile_width))
 
-	# build json response object of tiles
+                tile_dict["se_point"] = str(trans_field["sw_point"]["lat"] + (i*tile_height)) + \
+                "|" + \
+                str(trans_field["sw_point"]["long"] + (j*tile_width + tile_width))
 
-    for tile in tiles_dict:
-        closest_val = closest(list(height_set), tiles_dict[tile]["elevation"])
-        tiles_dict[tile]["height_val"] = list(height_set).index(closest_val)
+                tile_dict["ne_point"] = str(trans_field["sw_point"]["lat"] + (i*tile_height + tile_height)) + \
+                "|" + \
+                str(trans_field["sw_point"]["long"] + (j*tile_width + tile_width))
+                
+                tiles_dict[i*TILES_PER_FIELD_X + j] = tile_dict
+
+        print(tiles_dict)
+
+        # go get heights of every tile in dict and add to tiles_dict
+
+        for i in range(TILES_PER_FIELD_X * TILES_PER_FIELD_Y):
+            
+            url = ELEVATION_ENDPOINT + "/api/v1/lookup?locations=" + \
+            tiles_dict[i]["sw_point"].split('|')[0] + "," + \
+            tiles_dict[i]["sw_point"].split('|')[1]
+
+            print("url_test = " + url)
+
+            response = requests.get(url)
+
+            if (response.status_code == 200):
+                data = {}
+                data = response.json()
+
+                print(data)
+
+                tiles_dict[i]["elevation"] = data['results'][0]['elevation']
+
+        print("tiles post elevation... \n")
+        print(tiles_dict)
+
+        # normalize heights
+
+        height_set : set = set([])
+
+        for tile in tiles_dict:
+            height_set.add(tiles_dict[tile]["elevation"])
+
+        print("height set = ", str(height_set))
+
+        while (len(height_set) > MAX_HEIGHT_LEVELS):
+            first_val = height_set.pop()
+            sec_val = height_set.pop()
+
+            height_set.add((sec_val + first_val) / 2)
+
+        # build json response object of tiles
+
+        for tile in tiles_dict:
+            closest_val = closest(list(height_set), tiles_dict[tile]["elevation"])
+            tiles_dict[tile]["height_val"] = list(height_set).index(closest_val)
+        
+        print("FINAL TILES DICT = \n\n\n")
+        print(tiles_dict)
+
+        print("VISUAL\n\n")
+        print("this is", end="")
+        print(" a test")
+
+        for i in range(TILES_PER_FIELD_Y):
+            for j in range(TILES_PER_FIELD_X):
+                if (tiles_dict[i*TILES_PER_FIELD_X +j]["height_val"] == 0): 
+                    print("\033[1;32mO", end="")
+                elif (tiles_dict[i*TILES_PER_FIELD_X +j]["height_val"] == 1):
+                    print("\033[1;33mO", end="")
+                else:
+                    print("\033[1;34mO", end="")
+            print("")
+
+        print("\033[0m\nEND OF TEST")
+
+        return jsonify(tiles_dict)
     
-    print("FINAL TILES DICT = \n\n\n")
-    print(tiles_dict)
-
-    print("VISUAL\n\n")
-    print("this is", end="")
-    print(" a test")
-
-    for i in range(TILES_PER_FIELD_Y):
-        for j in range(TILES_PER_FIELD_X):
-            if (tiles_dict[i*TILES_PER_FIELD_X +j]["height_val"] == 0): 
-                print("\033[1;32mO", end="")
-            elif (tiles_dict[i*TILES_PER_FIELD_X +j]["height_val"] == 1):
-                print("\033[1;33mO", end="")
-            else:
-                print("\033[1;34mO", end="")
-        print("")
-
-    print("\033[0m\nEND OF TEST")
-
-    return jsonify(tiles_dict)
-
-
+    else:
+        return ("FORBIDDEN", 403)
 
 @app.route('/add', methods=['POST'])
 def create():
@@ -439,16 +506,23 @@ def create():
         Ensure you pass a custom ID as part of json body in post request,
         e.g. json={'id': '1', 'title': 'Write a blog post,}
     """
-    if currentUserReference:
-        try:
-            id = request.json['id']
-            todo_ref.document(id).set(request.json)
-            print("help")
-            return jsonify({"success": True}), 201
-        except Exception as e:
-            return f"An Error Occurred: {e}"
+
+    auth_token = request.get_json()["auth_token"]
+
+    if (check_auth(auth_token)[0]):
+
+        if currentUserReference:
+            try:
+                id = request.json['id']
+                todo_ref.document(id).set(request.json)
+                print("help")
+                return jsonify({"success": True}), 201
+            except Exception as e:
+                return f"An Error Occurred: {e}"
+        else:
+            return f"Not signed in"
     else:
-        return f"Not signed in"
+        return ("FORBIDDEN", 403)
     
 # @app.route("/addField", methods =['GET','POST'])
 # def addField():
@@ -484,20 +558,25 @@ def read():
         todo : Return document that matches query ID.
         all_todos : Return all documents.
     """
-    if (currentUserReference):
-        try:
-            # Check if ID was passed to URL query
-            todo_id = request.args.get('id')
-            if todo_id:
-                todo = todo_ref.document(todo_id).get()
-                return jsonify(todo.to_dict()), 200
-            else:
-                all_todos = [doc.to_dict() for doc in todo_ref.stream()]
-                return jsonify(all_todos), 200
-        except Exception as e:
-            return f"An Error Occurred: {e}"
+    auth_token = request.get_json()["auth_token"]
+
+    if (check_auth(auth_token)[0]):
+        if (currentUserReference):
+            try:
+                # Check if ID was passed to URL query
+                todo_id = request.args.get('id')
+                if todo_id:
+                    todo = todo_ref.document(todo_id).get()
+                    return jsonify(todo.to_dict()), 200
+                else:
+                    all_todos = [doc.to_dict() for doc in todo_ref.stream()]
+                    return jsonify(all_todos), 200
+            except Exception as e:
+                return f"An Error Occurred: {e}"
+        else:
+            return f"Not signed in"
     else:
-        return f"Not signed in"
+        return ("FORBIDDEN", 403)
 
 
 
@@ -508,35 +587,53 @@ def update():
         Ensure you pass a custom ID as part of json body in post request,
         e.g. json={'id': '1', 'title': 'Write a blog post today'}
     """
-    try:
-        id = request.json['id']
-        todo_ref.document(id).update(request.json)
-        return jsonify({"success": True}), 200
-    except Exception as e:
-        return f"An Error Occurred: {e}"
+
+    auth_token = request.get_json()["auth_token"]
+
+    if (check_auth(auth_token)[0]):
+
+        try:
+            id = request.json['id']
+            todo_ref.document(id).update(request.json)
+            return jsonify({"success": True}), 200
+        except Exception as e:
+            return f"An Error Occurred: {e}"
+    else:
+        return ("FORBIDDEN", 403)
 
 @app.route('/delete', methods=['GET', 'DELETE'])
 def delete():
     """
         delete() : Delete a document from Firestore collection.
     """
-    try:
-        # Check for ID in URL query
-        todo_id = request.args.get('id')
-        todo_ref.document(todo_id).delete()
-        return jsonify({"success": True}), 200
-    except Exception as e:
-        return f"An Error Occurred: {e}"
+
+    auth_token = request.get_json()["auth_token"]
+
+    if (check_auth(auth_token)[0]):
+        try:
+            # Check for ID in URL query
+            todo_id = request.args.get('id')
+            todo_ref.document(todo_id).delete()
+            return jsonify({"success": True}), 200
+        except Exception as e:
+            return f"An Error Occurred: {e}"
+    else:
+        return ("FORBIDDEN", 403)
 
 @app.route('/gates', methods=['GET'])
 def placeGates():
-    try:
-        print("trying to place gates")
-        gateplacements = placement.generateGatePlacement(0, 0, np.empty([2, 2])).tolist()
-        # print(json.dumps(gateplacements))
-        return jsonify(json.dumps(gateplacements)), 200
-    except Exception as e:
-        return f"An Error Occurred: {e}"
+
+    auth_token = request.get_json()["auth_token"]
+
+    if (check_auth(auth_token)[0]):
+        try:
+            print("trying to place gates")
+            gateplacements = placement.generateGatePlacement(0, 0, np.empty([2, 2])).tolist()
+            # print(json.dumps(gateplacements))
+            return jsonify(json.dumps(gateplacements)), 200
+        except Exception as e:
+            return f"An Error Occurred: {e}"
+    return ("FORBIDDEN", 403)
         
 
 port = int(os.environ.get('PORT', 8080))
