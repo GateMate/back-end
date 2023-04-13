@@ -5,7 +5,7 @@ import asyncio
 import json
 import requests
 from flask import Flask, request, jsonify
-from firebase_admin import credentials, firestore, initialize_app
+from firebase_admin import credentials, firestore, initialize_app, auth, _auth_utils
 from google.cloud.firestore import GeoPoint
 from weather_api import requestWeather
 
@@ -46,6 +46,19 @@ ELEVATION_ENDPOINT = "http://34.174.221.76"
 # Grabbed this from Geeks4Geeks because I don't need to write this myself
 def closest(lst, K):
     return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
+def check_auth(token: str):
+    try:
+        decoded_token = auth.verify_id_token(token)
+        uid = decoded_token['uid']
+
+        print("Decoded token = ", end="")
+        print(decoded_token)
+
+        return True, uid
+    except _auth_utils.InvalidIdTokenError:
+        print("INVALID ID TOKEN")
+
+        return False, ""
 
 def updateFieldDocument(fieldID,gateID):
     try:
@@ -125,46 +138,49 @@ def deleteField():
 def signUp():
     try:
         newUserId = request.get_json()['userID']
-        password = request.get_json()['password']
         jsonEntry = {
             'first_name': 'Jose',
             'last_name':'Martinez',
             'activeUser':'false',
             'fields':[],
-            'todos':[],
-            'password':password
+            'todos':[]
         }
         usersCollection.document(newUserId).set(jsonEntry)
         return jsonify({"success": True}), 200
     except Exception as e:
         return f"An Error Occurred: {e}"
-
+#sample request
+# {
+#     "token":""
+# }
 @app.route("/signin", methods =['GET','POST'])
 def signIn():
-    # global currentUserReference
-    currentUser = request.get_json()['userID']
-    checkPassword = request.get_json()['password']
-    userPassword = usersCollection.document(currentUser).get().to_dict()['password']
-    if checkPassword == userPassword:
+    auth_token = request.json()["token"]
+    if (check_auth(auth_token)[0]):
+        currentUser = auth_token[1]
         activeUser = {
             "activeUser":"true"
         }
         usersCollection.document(currentUser).update(activeUser)
         return jsonify({"success": True}), 200
     else:
-        return f"An Error occured - wrong password"
+        return ("FORBIDDEN", 403)
 
 @app.route("/signout",methods = ['GET','POST'])
 def signout():
-    try:
-        userID = request.get_json()['userID']
-        jsonEntry = {
-            "activeUser":'false'
-        }
-        usersCollection.document(userID).update(jsonEntry)
-        return jsonify({"success":True}),200
-    except Exception as e:
-        return f"An Error Occurred: {e}"
+    auth_token = request.json()["token"]
+    if (check_auth(auth_token)[0]):
+        try:
+            userID = request.get_json()['userID']
+            jsonEntry = {
+                "activeUser":'false'
+            }
+            usersCollection.document(userID).update(jsonEntry)
+            return jsonify({"success":True}),200
+        except Exception as e:
+            return f"An Error Occurred: {e}"
+    else:
+        return ("FORBIDDEN", 403)
 
 
 
@@ -465,12 +481,12 @@ def create():
         Ensure you pass a custom ID as part of json body in post request,
         e.g. json={'id': '1', 'title': 'Write a blog post,}
     """
-    currentUser = getActiveUser()
-    if (len(currentUser) == 0):
-        return f"Not signed in"  
-    else:
+    # currentUser = getActiveUser()
+    auth_token = request.get_json()["auth_token"]
+
+    if (check_auth(auth_token)[0]):  
         try:
-            userID = currentUser[0].id
+            userID =auth_token[1]
             newToDo = todo_ref.document()
             newToDo.set(request.json)
             updateUser(userID,newToDo.id)
@@ -479,6 +495,8 @@ def create():
         except Exception as e:
             print(e)
             return f"An Error Occurred: {e}"
+    else:
+        return ("FORBIDDEN", 403)
 
 
 
@@ -519,14 +537,11 @@ def read():
         todo : Return document that matches query ID.
         all_todos : Return all documents.
     """
-    currentUser = getActiveUser()
-    if (len(currentUser) == 0):
-        return f"Not signed in" 
-    else: 
+    auth_token = request.get_json()["auth_token"]
+    if (check_auth(auth_token)[0]):  
         try:
             # Check if ID was passed to URL query
             todo_id = request.args.get('id')
-            print("toDo",todo_id)
             if todo_id:
                 todo = todo_ref.document(todo_id).get()
                 return jsonify(todo.to_dict()), 200
@@ -535,6 +550,8 @@ def read():
                 return jsonify(all_todos), 200
         except Exception as e:
             return f"An Error Occurred: {e}"
+    else:
+        return ("FORBIDDEN", 403)
 
 @app.route('/update', methods=['POST', 'PUT'])
 def update():
