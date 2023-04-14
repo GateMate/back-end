@@ -619,10 +619,10 @@ def create():
 
     if (check_auth(auth_token)[0]):  
         try:
-            userID =auth_token[1]
+            # userID =auth_token[1]
             newToDo = todo_ref.document()
             newToDo.set(request.json)
-            updateTodoUser(userID,newToDo.id)
+            # updateTodoUser(userID,newToDo.id)
             print("help")
             return jsonify({"success": True})
         except Exception as e:
