@@ -49,14 +49,15 @@ def closest(lst, K):
 
 def check_auth(request: Flask.request_class):
     token = ""
-    try: 
-        token = request.get_json()['auth_token']
-    except KeyError:
+    if request.method == "GET":
         token = request.headers.get('Authorization')
+    else:
+        try: 
+            token = request.get_json()['auth_token']
+        except KeyError:
+            token = request.headers.get('Authorization')
 
     try:
-        print("token!!",token)
-
         decoded_token = auth.verify_id_token(token)
         uid = decoded_token['uid']
 
@@ -313,7 +314,6 @@ def fetchGates():
 @app.route('/getField', methods=['GET','POST'])
 def getField():
     if (check_auth(request)[0]):
-
         try:
             gateID = request.get_json()["fieldID"]
             jsonResponse = fields.document(gateID).get().to_dict()
@@ -329,8 +329,8 @@ def getFields():
     if (check_auth(request)[0]):
         fieldResponse = []
         try:
-            fields = fields.stream()
-            for field in fields:
+            fields_list = fields.stream()
+            for field in fields_list:
                 fieldResponse.append(field.id)
             # user = check_auth(auth_token)[1]
             # fields = usersCollection.document(str(user)).get().to_dict()["fields"]
@@ -341,7 +341,7 @@ def getFields():
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
-        return ("FORBIDDEN", 403)
+        return ("FORBIDDEN", 403)\
 
 
 #sample request body
