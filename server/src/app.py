@@ -228,7 +228,7 @@ def addField():
             fieldID = fieldEntry.id
             user = check_auth(auth_token)[1]
             updateFieldUser(fieldID,user)
-            return jsonify({"success": fieldID})
+            return docJsonEntry
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -322,7 +322,6 @@ def fetchGates():
     
 @app.route('/getField', methods=['GET','POST'])
 def getField():
-
     auth_token = request.get_json()["auth_token"]
 
     if (check_auth(auth_token)[0]):
@@ -335,6 +334,23 @@ def getField():
             return f"An Error Occurred: {e}"
     else:
         return ("FORBIDDEN", 403) 
+
+
+@app.route('/getFields', methods=['GET','POST'])
+def getFields():
+    auth_token = request.get_json()["auth_token"]    
+    if (check_auth(auth_token)[0]):
+        try:
+
+            user = check_auth(auth_token)[1]
+            fields = usersCollection.document(str(user)).get().to_dict()["fields"]
+            jsonResponse = json.dumps(fields)
+            return jsonResponse
+        except Exception as e:
+            return f"An Error Occurred: {e}"
+    else:
+        return ("FORBIDDEN", 403)
+
 
 #sample request body
 # {

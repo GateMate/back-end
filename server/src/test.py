@@ -35,7 +35,7 @@ def authenticate(email: str, password: str) -> requests.Response:
                                   data = auth_request)
     return auth_response
 
-EMAIL = "jmartiiiii@gmail.com"
+EMAIL = "jmartiiiiii@gmail.com"
 PASSWORD = "testPassword"
 user = create_user(EMAIL,PASSWORD)
 print(user)
