@@ -47,16 +47,23 @@ ELEVATION_ENDPOINT = "http://34.174.221.76"
 def closest(lst, K):
     return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
 
-def check_auth(token: str):
+def check_auth(request: Flask.request_class):
+    token = ""
+    try: 
+        token = request.get_json()['auth_token']
+    except KeyError:
+        token = request.headers.get('Authorization')
+
     try:
         decoded_token = auth.verify_id_token(token)
         uid = decoded_token['uid']
 
-        print("Decoded token = ", end="")
-        print(decoded_token)
-        return True,uid
+        # print("Decoded token = ", end="")
+        # print(decoded_token)
+
+        return True, uid
     except _auth_utils.InvalidIdTokenError:
-        print("INVALID ID TOKEN")
+        # print("INVALID ID TOKEN")
 
         return False, ""
 
@@ -93,13 +100,7 @@ def start():
 
 @app.route("/weather_forecast/<lat>/<long>", methods = ['GET'])
 def getWeather(lat = 0.0, long=0.0):
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
         try:
             forecast_data = requestWeather(lat, long)#(36.082157, -94.171852)
             forecast_hourly = forecast_data['hourly']
@@ -118,13 +119,7 @@ def getWeather(lat = 0.0, long=0.0):
 # }
 @app.route("/updateNodeIds", methods = ["GET","POST"])
 def updateNodeId():
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
         try:
             jsonRequest = request.get_json()
             gates = set(jsonRequest.keys())
@@ -147,13 +142,7 @@ def updateNodeId():
 
 @app.route("/deleteField",methods = ['GET','POST'])
 def deleteField():
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
         try:
             fieldID = request.get_json()['fieldID']
             fields.document(fieldID).delete() 
@@ -170,12 +159,7 @@ def deleteField():
 # }
 @app.route("/signup", methods =['GET','POST'])
 def signUp():
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
         initializeUser(check_auth(auth_token)[1])
         return jsonify({"success": True}), 200
     else:
@@ -185,8 +169,7 @@ def signUp():
 #may not beed needed
 @app.route("/signin", methods =['GET','POST'])
 def signIn():
-    auth_token = request.json()["token"]
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
         currentUser = check_auth(auth_token)[1]
         activeUser = {
             "activeUser":"true"
@@ -199,12 +182,7 @@ def signIn():
 #may also not be needed
 @app.route("/signout",methods = ['GET','POST'])
 def signout():
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
         try:
             userID = request.get_json()['userID']
             jsonEntry = {
@@ -226,12 +204,7 @@ def signout():
 # }
 @app.route("/addField", methods =['GET','POST'])
 def addField():
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"] 
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
         try:
             firstGeopoint = request.get_json()['nw']
             secondGeopoint = request.get_json()['ne']
@@ -266,14 +239,7 @@ def addField():
 # }
 @app.route("/setGateHeight", methods =['GET','POST'])
 def setGateHeight():
-
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
         try:
             gateHeight = request.get_json()['height']
             gateID = request.get_json()['gateID']
@@ -299,14 +265,7 @@ def setGateHeight():
 # }
 @app.route("/addGate", methods =['GET','POST'])
 def addGates():
-
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
         try:
             gateEntry = realGatesCollection.document()
 
@@ -330,14 +289,7 @@ def addGates():
 
 @app.route("/getGates",methods = ['GET','POST'])
 def fetchGates():
-
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
         try:
             jsonResponse = {}
 
@@ -358,13 +310,7 @@ def fetchGates():
     
 @app.route('/getField', methods=['GET','POST'])
 def getField():
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
 
         try:
             gateID = request.get_json()["fieldID"]
@@ -377,13 +323,8 @@ def getField():
 
 
 @app.route('/getFields', methods=['GET','POST'])
-def getFields():
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]   
-    if (check_auth(auth_token)[0]):
+def getFields(): 
+    if (check_auth(request)[0]):
         try:
 
             user = check_auth(auth_token)[1]
@@ -403,14 +344,7 @@ def getFields():
 # }
 @app.route('/adjustGateLocation', methods=['GET','POST'])
 def adjustGateLocation():
-
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
         try:
             lat,long = tuple(request.get_json()["location"].split("|"))
             gateID = request.get_json()['gateID']
@@ -432,14 +366,7 @@ def adjustGateLocation():
 # }
 @app.route('/tile-field',methods=['GET', 'POST'])
 def tileField():
-
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
 
         current_field = {}
         try:
@@ -604,13 +531,7 @@ def create():
         e.g. json={'id': '1', 'title': 'Write a blog post,}
     """
     # currentUser = getActiveUser()
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-
-    if (check_auth(auth_token)[0]):  
+    if (check_auth(request)[0]):  
         try:
             userID =auth_token[1]
             newToDo = todo_ref.document()
@@ -631,12 +552,7 @@ def read():
         todo : Return document that matches query ID.
         all_todos : Return all documents.
     """
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-    if (check_auth(auth_token)[0]):  
+    if (check_auth(request)[0]):  
         try:
             # Check if ID was passed to URL query
             todo_id = request.args.get('id')
@@ -658,14 +574,7 @@ def update():
         Ensure you pass a custom ID as part of json body in post request,
         e.g. json={'id': '1', 'title': 'Write a blog post today'}
     """
-
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
 
         try:
             id = request.json['id']
@@ -681,14 +590,7 @@ def delete():
     """
         delete() : Delete a document from Firestore collection.
     """
-
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
         try:
             # Check for ID in URL query
             todo_id = request.args.get('id')
@@ -701,14 +603,7 @@ def delete():
 
 @app.route('/gates', methods=['GET'])
 def placeGates():
-
-    auth_token = (False, "")
-    try: 
-        auth_token = request.headers.get('Authorization')
-    except KeyError:
-        auth_token = request.get_json()["auth_token"]
-
-    if (check_auth(auth_token)[0]):
+    if (check_auth(request)[0]):
         try:
             print("trying to place gates")
             gateplacements = placement.generateGatePlacement(0, 0, np.empty([2, 2])).tolist()
