@@ -49,6 +49,8 @@ def closest(lst, K):
 
 def check_auth(token: str):
     try:
+        print("token!!",token)
+
         decoded_token = auth.verify_id_token(token)
         uid = decoded_token['uid']
 
@@ -250,9 +252,9 @@ def addField():
             }
             fieldEntry.set(docJsonEntry)
             fieldID = fieldEntry.id
-            user = check_auth(auth_token)[1]
-            updateFieldUser(fieldID,user)
-            return docJsonEntry
+            return jsonify({"success": fieldID}), 200
+
+            # user = check_auth(auth_token)[1]
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -384,11 +386,16 @@ def getFields():
     except KeyError:
         auth_token = request.get_json()["auth_token"]   
     if (check_auth(auth_token)[0]):
+        fieldResponse = []
         try:
+            fields = fields.stream()
+            for field in fields:
+                fieldResponse.append(field.id)
+            # user = check_auth(auth_token)[1]
+            # fields = usersCollection.document(str(user)).get().to_dict()["fields"]
+            
+            jsonResponse = json.dumps(fieldResponse)
 
-            user = check_auth(auth_token)[1]
-            fields = usersCollection.document(str(user)).get().to_dict()["fields"]
-            jsonResponse = json.dumps(fields)
             return jsonResponse
         except Exception as e:
             return f"An Error Occurred: {e}"
