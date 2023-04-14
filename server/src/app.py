@@ -55,6 +55,8 @@ def check_auth(request: Flask.request_class):
         token = request.headers.get('Authorization')
 
     try:
+        print("token!!",token)
+
         decoded_token = auth.verify_id_token(token)
         uid = decoded_token['uid']
 
@@ -160,7 +162,7 @@ def deleteField():
 @app.route("/signup", methods =['GET','POST'])
 def signUp():
     if (check_auth(request)[0]):
-        initializeUser(check_auth(auth_token)[1])
+        initializeUser(check_auth(request)[1])
         return jsonify({"success": True}), 200
     else:
         return ("FORBIDDEN", 403)
@@ -170,7 +172,7 @@ def signUp():
 @app.route("/signin", methods =['GET','POST'])
 def signIn():
     if (check_auth(request)[0]):
-        currentUser = check_auth(auth_token)[1]
+        currentUser = check_auth(request)[1]
         activeUser = {
             "activeUser":"true"
         }
@@ -223,9 +225,9 @@ def addField():
             }
             fieldEntry.set(docJsonEntry)
             fieldID = fieldEntry.id
-            user = check_auth(auth_token)[1]
-            updateFieldUser(fieldID,user)
-            return docJsonEntry
+            return jsonify({"success": fieldID}), 200
+
+            # user = check_auth(auth_token)[1]
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -325,11 +327,16 @@ def getField():
 @app.route('/getFields', methods=['GET','POST'])
 def getFields(): 
     if (check_auth(request)[0]):
+        fieldResponse = []
         try:
+            fields = fields.stream()
+            for field in fields:
+                fieldResponse.append(field.id)
+            # user = check_auth(auth_token)[1]
+            # fields = usersCollection.document(str(user)).get().to_dict()["fields"]
+            
+            jsonResponse = json.dumps(fieldResponse)
 
-            user = check_auth(auth_token)[1]
-            fields = usersCollection.document(str(user)).get().to_dict()["fields"]
-            jsonResponse = json.dumps(fields)
             return jsonResponse
         except Exception as e:
             return f"An Error Occurred: {e}"
@@ -533,10 +540,10 @@ def create():
     # currentUser = getActiveUser()
     if (check_auth(request)[0]):  
         try:
-            userID =auth_token[1]
+            # userID =auth_token[1]
             newToDo = todo_ref.document()
             newToDo.set(request.json)
-            updateTodoUser(userID,newToDo.id)
+            # updateTodoUser(userID,newToDo.id)
             print("help")
             return jsonify({"success": True})
         except Exception as e:
