@@ -9,6 +9,7 @@ MAX_HEIGHT_LEVELS = 4
 
 ELEVATION_ENDPOINT = "http://34.174.221.76"
 
+# Grabbed this from Geeks4Geeks because I don't need to write this myself
 def closest(lst, K):
     return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
 
@@ -29,7 +30,7 @@ def generateGatePlacement(latitude, longitude, map: np.array):
 def tileField(current_field: dict) -> dict:
 
 	current_field = {}
-	
+
 	test_field : dict[str, str] = {
             'sw_point': "36.0627|-94.1606",
             'nw_point': "36.0628|-94.1606",

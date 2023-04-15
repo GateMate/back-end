@@ -1,31 +1,25 @@
 # Required imports
 import os
 import numpy as np
-import asyncio
 import json
-import requests
 from flask import Flask, request, jsonify
-from firebase_admin import credentials, firestore, initialize_app, auth, _auth_utils
-from google.cloud.firestore import GeoPoint
+from firebase_admin import credentials, auth, _auth_utils
 from weather_api import requestWeather
 import FB_interface
 
-from random import randrange
-import placement
-
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
+# class NumpyEncoder(json.JSONEncoder):
+#     def default(self, obj):
+#         if isinstance(obj, np.ndarray):
+#             return obj.tolist()
+#         return json.JSONEncoder.default(self, obj)
 
 # Initialize Flask app
 app = Flask(__name__)
 
+# Initialize database instance
 fbInter= FB_interface.FBInterface(credentials.Certificate('key.json'))
 
 #main link: https://todo-proukhgi3a-uc.a.run.app
-# Grabbed this from Geeks4Geeks because I don't need to write this myself
 
 def check_auth(request: Flask.request_class):
     token = ""
@@ -36,15 +30,12 @@ def check_auth(request: Flask.request_class):
             token = request.get_json()['auth_token']
         except KeyError:
             token = request.headers.get('Authorization')
-
     try:
         decoded_token = auth.verify_id_token(token)
         uid = decoded_token['uid']
 
         return True, uid
     except _auth_utils.InvalidIdTokenError:
-        # print("INVALID ID TOKEN")
-
         return False, ""
 
 def updateFieldDocument(fieldID,gateID):
@@ -70,7 +61,13 @@ def getWeather(lat = 0.0, long=0.0):
             forecast_hourly = forecast_data['hourly']
             #print(forecast_hourly.keys())
             #print(forecast_data['hourly']) 
-            return jsonify({"precipitation_hourly": forecast_hourly['precipitation'], "timedate_hourly": forecast_hourly['time']}), 200
+            return (
+                jsonify(
+                    {"precipitation_hourly": forecast_hourly['precipitation'], 
+                    "timedate_hourly": forecast_hourly['time']}
+                    ), 
+                200
+            )
         except:
             return jsonify(({"error":"error occured with weather api"})), 500
     else:
@@ -123,37 +120,6 @@ def signUp():
             return jsonify({"success": True}), 200
         else:
             return ("Internal Server Error", 500)
-    else:
-        return ("FORBIDDEN", 403)
-
-
-#may not beed needed
-@app.route("/signin", methods =['GET','POST'])
-def signIn():
-    if (check_auth(request)[0]):
-        try:
-            userID = check_auth(request)[1]
-            if (fbInter.activateUser(userID=userID)):
-                return ("OK", 200)
-            else:
-                return ("Internal Server Error", 500)
-        except Exception as e:
-            return f"An Error Occurred: {e}"
-    else:
-        return ("FORBIDDEN", 403)
-
-#may also not be needed
-@app.route("/signout",methods = ['GET','POST'])
-def signout():
-    if (check_auth(request)[0]):
-        try:
-            userID = check_auth(request)[1]
-            if (fbInter.deactivateUser(userID=userID)):
-                return ("OK", 200)
-            else:
-                return ("Internal Server Error", 500)
-        except Exception as e:
-            return f"An Error Occurred: {e}"
     else:
         return ("FORBIDDEN", 403)
 
@@ -460,28 +426,6 @@ def delete():
     else:
         return ("FORBIDDEN", 403)
 
-# @app.route('/gates', methods=['GET'])
-# def placeGates():
-#     if (check_auth(request)[0]):
-#         try:
-#             print("trying to place gates")
-#             gateplacements = placement.generateGatePlacement(0, 0, np.empty([2, 2])).tolist()
-#             # print(json.dumps(gateplacements))
-#             return jsonify(json.dumps(gateplacements)), 200
-#         except Exception as e:
-#             return f"An Error Occurred: {e}"
-#     return ("FORBIDDEN", 403)
-        
-
 port = int(os.environ.get('PORT', 8080))
 if __name__ == '__main__':
     app.run(threaded=True, host='0.0.0.0', port=port)
-
-
-#end point -> 4 latitude points 
-
-#another route within a field
-#add another titles property into fields that 
-#1.title ID
-#2.4 verticies
-#3.relative height
