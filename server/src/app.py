@@ -8,6 +8,7 @@ from flask import Flask, request, jsonify
 from firebase_admin import credentials, firestore, initialize_app, auth, _auth_utils
 from google.cloud.firestore import GeoPoint
 from weather_api import requestWeather
+import FB_interface
 
 from random import randrange
 import placement
@@ -21,31 +22,23 @@ class NumpyEncoder(json.JSONEncoder):
 # Initialize Flask app
 app = Flask(__name__)
 
+fbInter= FB_interface.FBInterface(credentials.Certificate('key.json'))
+
 # Initialize Firestore DB
 cred = credentials.Certificate('key.json')
-default_app = initialize_app(cred)
-db = firestore.client()
+#default_app = initialize_app(cred)
+# db = firestore.client()
 
-#Initializing Collections
-todo_ref = db.collection('todos')
-fields = db.collection('fields')
-usersCollection = db.collection('users')
-gatesCollection = db.collection("gates_test")
-realGatesCollection = db.collection('gates')
-currentUserReference = None
-
-TILES_PER_FIELD_X = 8
-TILES_PER_FIELD_Y = 8
-
-
-MAX_HEIGHT_LEVELS = 4
-
-ELEVATION_ENDPOINT = "http://34.174.221.76"
+# #Initializing Collections
+# todo_ref = db.collection('todos')
+# fields = db.collection('fields')
+# usersCollection = db.collection('users')
+# gatesCollection = db.collection("gates_test")
+# realGatesCollection = db.collection('gates')
+# currentUserReference = None
 
 #main link: https://todo-proukhgi3a-uc.a.run.app
 # Grabbed this from Geeks4Geeks because I don't need to write this myself
-def closest(lst, K):
-    return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
 
 def check_auth(request: Flask.request_class):
     token = ""
@@ -72,29 +65,13 @@ def check_auth(request: Flask.request_class):
 
 def updateFieldDocument(fieldID,gateID):
     try:
-        fieldDocument = fields.document(fieldID)
-        fieldDocument.update({u'gates': firestore.ArrayUnion([str(gateID)])})
-        jsonResponse = fields.document(fieldID).get().to_dict()
-        return jsonResponse
+        field_json = fbInter.updateField(fieldID, gateID)
+        if (field_json[0]):
+            return field_json[1], 200
+        else:
+            return 500
     except Exception as e:
         return f"An Error Occurred: {e}"
-
-def initializeUser(userID):
-    print("user",userID)
-    initialEntry = {
-        "fields":[],
-        "todos":[]
-    }
-    usersCollection.document(str(userID)).set(initialEntry)
-
-def updateFieldUser(fieldID,userID):
-    usersDocument = usersCollection.document(userID)
-    usersDocument.update({u'fields': firestore.ArrayUnion([str(fieldID)])})
-
-def updateTodoUser(user_id,todo_id):
-    usersDocument = usersCollection.document(user_id)
-    usersDocument.update({u'todos': firestore.ArrayUnion([str(todo_id)])})
-
 
 #the addField and addGate routes will not work until the user signs in(sign in route)
 @app.route("/",methods = ['GET'])
@@ -120,24 +97,17 @@ def getWeather(lat = 0.0, long=0.0):
 # {
 #   "XpRSItWlLGa1b4NuDvJn" : "10"a
 # }
-@app.route("/updateNodeIds", methods = ["GET","POST"])
+@app.route("/updateNodeId", methods = ["GET","POST"])
 def updateNodeId():
     if (check_auth(request)[0]):
         try:
-            jsonRequest = request.get_json()
-            gates = set(jsonRequest.keys())
-            docs = db.collection(u'gates').stream()
-            print(gates)
+            gate_id = request.get_json()['gateID']
+            node_id = request.get_json()['nodeID']
 
-            for doc in docs:
-                currentGateId = str(doc.id)
-                if currentGateId in gates:
-                    nodeID = jsonRequest[currentGateId]
-                    updatedFieldsDocument ={
-                        "nodeID":nodeID,
-                    }
-                    realGatesCollection.document(doc.id).update(updatedFieldsDocument)                
-            return jsonify({"success": True}), 200
+            if (fbInter.updateNodeID(gate_id, node_id)):       
+                return jsonify({"success": True}), 200
+            else: 
+                return jsonify({"success": False}), 500
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -148,8 +118,10 @@ def deleteField():
     if (check_auth(request)[0]):
         try:
             fieldID = request.get_json()['fieldID']
-            fields.document(fieldID).delete() 
-            return jsonify({"success": True}), 200
+            if (fbInter.deleteField(fieldID)):
+                return jsonify({"success": True}), 200
+            else:
+                return jsonify({"success": False}, 500)
         except Exception as e:
             return f"An Error Occurred : {e}"
     else:
@@ -163,8 +135,10 @@ def deleteField():
 @app.route("/signup", methods =['GET','POST'])
 def signUp():
     if (check_auth(request)[0]):
-        initializeUser(check_auth(request)[1])
-        return jsonify({"success": True}), 200
+        if (fbInter.initUser(check_auth(request)[1])):
+            return jsonify({"success": True}), 200
+        else:
+            return jsonify({"success": False}), 500
     else:
         return ("FORBIDDEN", 403)
 
@@ -173,12 +147,14 @@ def signUp():
 @app.route("/signin", methods =['GET','POST'])
 def signIn():
     if (check_auth(request)[0]):
-        currentUser = check_auth(request)[1]
-        activeUser = {
-            "activeUser":"true"
-        }
-        usersCollection.document(currentUser).update(activeUser)
-        return jsonify({"success": True}), 200
+        try:
+            userID = check_auth(request)[1]
+            if (fbInter.activateUser(userID=userID)):
+                return jsonify({"success":True}), 200
+            else:
+                return jsonify({"success": False}), 500
+        except Exception as e:
+            return f"An Error Occurred: {e}"
     else:
         return ("FORBIDDEN", 403)
 
@@ -187,12 +163,11 @@ def signIn():
 def signout():
     if (check_auth(request)[0]):
         try:
-            userID = request.get_json()['userID']
-            jsonEntry = {
-                "activeUser":'false'
-            }
-            usersCollection.document(userID).update(jsonEntry)
-            return jsonify({"success":True}),200
+            userID = check_auth(request)[1]
+            if (fbInter.deactivateUser(userID=userID)):
+                return jsonify({"success":True}), 200
+            else:
+                return jsonify({"success": False}), 500
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -214,20 +189,19 @@ def addField():
             thirdGeopoint = request.get_json()['sw']
             fourthGeopoint = request.get_json()['se']
 
-            #creating fields and doc object to generate a fieldID
-            fieldEntry = fields.document()        
-            docJsonEntry = {
-                "field_name":'test_field',
-                "nw_point" : firstGeopoint,
-                "ne_point": secondGeopoint,
-                "sw_point": thirdGeopoint,
-                "se_point": fourthGeopoint,
-                "gates": []
-            }
-            fieldEntry.set(docJsonEntry)
-            fieldID = fieldEntry.id
-            return jsonify({"success": fieldID}), 200
+            new_field = fbInter.createField(
+                firstGeopoint,
+                secondGeopoint,
+                thirdGeopoint,
+                fourthGeopoint
+            )
 
+            if (new_field[0]):
+                fieldID = new_field[1]
+                return (jsonify({"success": fieldID}), 200)
+            else:
+                return (jsonify({"success": False}), 500)
+            
             # user = check_auth(auth_token)[1]
         except Exception as e:
             return f"An Error Occurred: {e}"
@@ -247,10 +221,13 @@ def setGateHeight():
             gateHeight = request.get_json()['height']
             gateID = request.get_json()['gateID']
 
-            updatedGateDocument = {"height":gateHeight}
-            realGatesCollection.document(gateID).update(updatedGateDocument)
+            if (fbInter.setGateHeight(
+                gateID=gateID, 
+                newHeight=gateHeight)):
 
-            return jsonify({"success": True}), 200
+                return jsonify({"success": True}), 200
+            else:
+                return (jsonify({"success": False}), 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -270,21 +247,20 @@ def setGateHeight():
 def addGates():
     if (check_auth(request)[0]):
         try:
-            gateEntry = realGatesCollection.document()
-
             lat,long = tuple(request.get_json()["gateLocation"].split("|"))
             fieldID = request.get_json()["fieldID"]
 
-            gateJson = {
-                "lat": lat,
-                "long":long,
-                "nodeID":0,
-                "height":20
-            }
-            gateEntry.set(gateJson)
-            createdGateID = gateEntry.id
-            updateFieldDocument(fieldID,createdGateID)
-            return jsonify({"success": True})
+            new_gate = fbInter.createGate(
+                lat=lat,
+                long=long, 
+            )
+
+            if (new_gate[0]):
+                fbInter.updateField(fieldID, new_gate[1])
+            
+                return (jsonify({"success": True}), 200)
+            else:
+                return (jsonify({"success": False}), 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:   
@@ -294,18 +270,11 @@ def addGates():
 def fetchGates():
     if (check_auth(request)[0]):
         try:
-            jsonResponse = {}
-
-            gates = realGatesCollection.stream()
-            for gate in gates:
-                currentGate = gate.to_dict()
-                jsonResponse[gate.id] = {
-                    "lat": currentGate["lat"],
-                    "long":currentGate["long"],
-                    "height": currentGate["height"],
-                    "nodeID":currentGate["nodeID"]         
-                }
-            return jsonResponse
+            gates = fbInter.fetchGates()
+            if (gates[0]):
+                return jsonify(gates[1])
+            else:
+                return (jsonify({"success": False}), 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -314,10 +283,17 @@ def fetchGates():
 @app.route('/getField', methods=['GET','POST'])
 def getField():
     if (check_auth(request)[0]):
+        fieldID = ""
+        if (request.method == "GET"):
+            fieldID = request.args.get('fieldID')
+        else:
+            fieldID = request.get_json()['fieldID']
         try:
-            gateID = request.get_json()["fieldID"]
-            jsonResponse = fields.document(gateID).get().to_dict()
-            return jsonResponse
+            field_dict = fbInter.getField(fieldID=fieldID)
+            if (field_dict[0]):        
+                return (jsonify(field_dict[1]), 200)
+            else:
+                return (jsonify({"success": False}), 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -329,15 +305,11 @@ def getFields():
     if (check_auth(request)[0]):
         fieldResponse = []
         try:
-            fields_list = fields.stream()
-            for field in fields_list:
-                fieldResponse.append(field.id)
-            # user = check_auth(auth_token)[1]
-            # fields = usersCollection.document(str(user)).get().to_dict()["fields"]
-            
-            jsonResponse = json.dumps(fieldResponse)
-
-            return jsonResponse
+            fields = fbInter.fetchFields()
+            if (fields[0]):
+                return jsonify(fields[1]), 200
+            else:
+                return (jsonify({"success": False}), 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -353,14 +325,18 @@ def getFields():
 def adjustGateLocation():
     if (check_auth(request)[0]):
         try:
-            lat,long = tuple(request.get_json()["location"].split("|"))
+            lat = request.get_json()["location"].split("|")[0]
+            long = request.get_json()["location"].split("|")[1]
             gateID = request.get_json()['gateID']
-            updatedGateDocument = {
-                "lat":lat,
-                "long":long
-            }
-            realGatesCollection.document(gateID).update(updatedGateDocument)        
-            return jsonify({"success": True})
+
+            if (fbInter.setGateLocation(
+                gateID=gateID,
+                lat=lat,
+                long=long
+            )):
+                return jsonify({"success": True}), 200
+            else:
+                return jsonify({"success": False}), 500
         except Exception as e:
             return f"An Error Occurred: {e}"
     
@@ -374,159 +350,16 @@ def adjustGateLocation():
 @app.route('/tile-field',methods=['GET', 'POST'])
 def tileField():
     if (check_auth(request)[0]):
-
-        current_field = {}
         try:
-            gateID = request.get_json()["fieldID"]
-            jsonResponse = fields.document(gateID).get().to_dict()
-            print("JSON",jsonResponse)
-            current_field = jsonResponse.copy()
+            field_id = request.get_json()["fieldID"]
+            tiled_field = fbInter.getFieldTiles(fieldID=field_id)
+
+            if (tiled_field[0]):
+                return jsonify(tiled_field[1]), 200      
+            else:
+                return 500
         except Exception as e:
             return f"An Error Occurred: {e}"
-        
-        test_field : dict[str, str] = {
-            'sw_point': "36.0627|-94.1606",
-            'nw_point': "36.0628|-94.1606",
-            'ne_point': "36.0628|-94.1605",
-            'se_point': "36.0627|-94.1605"
-        }
-
-        ########################
-
-        #current_field : dict[str, str] = test_field.copy()
-
-        trans_field : dict[str: [str, float]] = {
-            "sw_point" : {
-                "lat" : float(current_field["sw_point"].split('|')[0]),
-                "long" : float(current_field["sw_point"].split('|')[1])
-            }, 
-            "nw_point" : {
-                "lat" : float(current_field["nw_point"].split('|')[0]),
-                "long" : float(current_field["nw_point"].split('|')[1])
-            }, 
-            "se_point" : {
-                "lat" : float(current_field["se_point"].split('|')[0]),
-                "long" : float(current_field["se_point"].split('|')[1])
-            }, 
-            "ne_point" : {
-                "lat" : float(current_field["ne_point"].split('|')[0]),
-                "long" : float(current_field["ne_point"].split('|')[1])
-            }
-        } 
-        
-        print(trans_field)
-        
-        # tile the field and get the width and height of each tile
-
-        n_dist = abs(trans_field["ne_point"]["long"] - trans_field["nw_point"]["long"])
-        s_dist = abs(trans_field["se_point"]["long"] - trans_field["sw_point"]["long"])
-        e_dist = abs(trans_field["se_point"]["lat"] - trans_field["ne_point"]["lat"])
-        w_dist = abs(trans_field["sw_point"]["lat"] - trans_field["nw_point"]["lat"])
-
-        print("n_dist = " + str(n_dist))
-        print("s_dist = " + str(s_dist))
-        print("w_dist = " + str(w_dist))
-        print("e_dist = " + str(e_dist))
-
-        tile_width = ((n_dist + s_dist) / 2) / TILES_PER_FIELD_X
-        tile_height = ((e_dist + w_dist) / 2) / TILES_PER_FIELD_Y
-
-        print("tile_widt = " + str(tile_width))
-        print("tile_height = " + str(tile_height))
-
-        print("BELOW THIS IS THE TILES_DICT \n")
-
-        tiles_dict: dict[int: [str, str]] = {}
-
-        for i in range(TILES_PER_FIELD_Y):
-            for j in range(TILES_PER_FIELD_X):
-                tile_dict = {}
-
-                tile_dict["sw_point"] = str(trans_field["sw_point"]["lat"] + i*tile_height) + \
-                "|" + \
-                str(trans_field["sw_point"]["long"] + (j*tile_width))
-
-                tile_dict["nw_point"] = str(trans_field["sw_point"]["lat"] + (i*tile_height + tile_height)) + \
-                "|" + \
-                str(trans_field["sw_point"]["long"] + (j*tile_width))
-
-                tile_dict["se_point"] = str(trans_field["sw_point"]["lat"] + (i*tile_height)) + \
-                "|" + \
-                str(trans_field["sw_point"]["long"] + (j*tile_width + tile_width))
-
-                tile_dict["ne_point"] = str(trans_field["sw_point"]["lat"] + (i*tile_height + tile_height)) + \
-                "|" + \
-                str(trans_field["sw_point"]["long"] + (j*tile_width + tile_width))
-                
-                tiles_dict[i*TILES_PER_FIELD_X + j] = tile_dict
-
-        print(tiles_dict)
-
-        # go get heights of every tile in dict and add to tiles_dict
-
-        for i in range(TILES_PER_FIELD_X * TILES_PER_FIELD_Y):
-            
-            url = ELEVATION_ENDPOINT + "/api/v1/lookup?locations=" + \
-            tiles_dict[i]["sw_point"].split('|')[0] + "," + \
-            tiles_dict[i]["sw_point"].split('|')[1]
-
-            print("url_test = " + url)
-
-            response = requests.get(url)
-
-            if (response.status_code == 200):
-                data = {}
-                data = response.json()
-
-                print(data)
-
-                tiles_dict[i]["elevation"] = data['results'][0]['elevation']
-
-        print("tiles post elevation... \n")
-        print(tiles_dict)
-
-        # normalize heights
-
-        height_set : set = set([])
-
-        for tile in tiles_dict:
-            height_set.add(tiles_dict[tile]["elevation"])
-
-        print("height set = ", str(height_set))
-
-        while (len(height_set) > MAX_HEIGHT_LEVELS):
-            first_val = height_set.pop()
-            sec_val = height_set.pop()
-
-            height_set.add((sec_val + first_val) / 2)
-
-        # build json response object of tiles
-
-        for tile in tiles_dict:
-            closest_val = closest(list(height_set), tiles_dict[tile]["elevation"])
-            tiles_dict[tile]["height_val"] = list(height_set).index(closest_val)
-        
-        print("FINAL TILES DICT = \n\n\n")
-        print(tiles_dict)
-
-        print("VISUAL\n\n")
-        print("this is", end="")
-        print(" a test")
-
-        for i in range(TILES_PER_FIELD_Y):
-            for j in range(TILES_PER_FIELD_X):
-                if (tiles_dict[i*TILES_PER_FIELD_X +j]["height_val"] == 0): 
-                    print("\033[1;32mO", end="")
-                elif (tiles_dict[i*TILES_PER_FIELD_X +j]["height_val"] == 1):
-                    print("\033[1;33mO", end="")
-                else:
-                    print("\033[1;34mO", end="")
-            print("")
-
-        print("\033[0m\nEND OF TEST")
-
-        return jsonify(tiles_dict)
-    
     else:
         return ("FORBIDDEN", 403)
 
@@ -540,12 +373,20 @@ def create():
     # currentUser = getActiveUser()
     if (check_auth(request)[0]):  
         try:
-            # userID =auth_token[1]
-            newToDo = todo_ref.document()
-            newToDo.set(request.json)
-            # updateTodoUser(userID,newToDo.id)
-            print("help")
-            return jsonify({"success": True})
+            to_do_title = request.get_json()['title']
+            try:
+                to_do_id = request.get_json()['id']
+                new_to_do = fbInter.createToDo(
+                    title=to_do_title, toDoID=to_do_id
+                )
+            except KeyError:
+                new_to_do = fbInter.createToDo(
+                    title=to_do_title
+                )
+            if (new_to_do[0]):
+                return jsonify({"success": True}), 200
+            else:
+                return jsonify({"success": False}), 500
         except Exception as e:
             print(e)
             return f"An Error Occurred: {e}"
@@ -563,12 +404,16 @@ def read():
         try:
             # Check if ID was passed to URL query
             todo_id = request.args.get('id')
+            to_do = None
             if todo_id:
-                todo = todo_ref.document(todo_id).get()
-                return jsonify(todo.to_dict()), 200
+                to_do = fbInter.getToDo(toDoID=todo_id)
             else:
-                all_todos = [doc.to_dict() for doc in todo_ref.stream()]
-                return jsonify(all_todos), 200
+                to_do = fbInter.getToDo()
+            
+            if (to_do[0]):
+                return jsonify(to_do), 200
+            else:
+                return 500
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -584,9 +429,13 @@ def update():
     if (check_auth(request)[0]):
 
         try:
-            id = request.json['id']
-            todo_ref.document(id).update(request.json)
-            return jsonify({"success": True}), 200
+            id = request.get_json()['id']
+            title = request.get_json()['title']
+            
+            if (fbInter.updateToDo(id, title)):
+                return jsonify({"success": True}), 200
+            else:
+                return 500
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -601,24 +450,26 @@ def delete():
         try:
             # Check for ID in URL query
             todo_id = request.args.get('id')
-            todo_ref.document(todo_id).delete()
-            return jsonify({"success": True}), 200
+            if (fbInter.deleteToDo(todo_id)):
+                return jsonify({"success": True}), 200
+            else:
+                return 500
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
         return ("FORBIDDEN", 403)
 
-@app.route('/gates', methods=['GET'])
-def placeGates():
-    if (check_auth(request)[0]):
-        try:
-            print("trying to place gates")
-            gateplacements = placement.generateGatePlacement(0, 0, np.empty([2, 2])).tolist()
-            # print(json.dumps(gateplacements))
-            return jsonify(json.dumps(gateplacements)), 200
-        except Exception as e:
-            return f"An Error Occurred: {e}"
-    return ("FORBIDDEN", 403)
+# @app.route('/gates', methods=['GET'])
+# def placeGates():
+#     if (check_auth(request)[0]):
+#         try:
+#             print("trying to place gates")
+#             gateplacements = placement.generateGatePlacement(0, 0, np.empty([2, 2])).tolist()
+#             # print(json.dumps(gateplacements))
+#             return jsonify(json.dumps(gateplacements)), 200
+#         except Exception as e:
+#             return f"An Error Occurred: {e}"
+#     return ("FORBIDDEN", 403)
         
 
 port = int(os.environ.get('PORT', 8080))
