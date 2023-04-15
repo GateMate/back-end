@@ -24,19 +24,6 @@ app = Flask(__name__)
 
 fbInter= FB_interface.FBInterface(credentials.Certificate('key.json'))
 
-# Initialize Firestore DB
-cred = credentials.Certificate('key.json')
-#default_app = initialize_app(cred)
-# db = firestore.client()
-
-# #Initializing Collections
-# todo_ref = db.collection('todos')
-# fields = db.collection('fields')
-# usersCollection = db.collection('users')
-# gatesCollection = db.collection("gates_test")
-# realGatesCollection = db.collection('gates')
-# currentUserReference = None
-
 #main link: https://todo-proukhgi3a-uc.a.run.app
 # Grabbed this from Geeks4Geeks because I don't need to write this myself
 
@@ -54,9 +41,6 @@ def check_auth(request: Flask.request_class):
         decoded_token = auth.verify_id_token(token)
         uid = decoded_token['uid']
 
-        # print("Decoded token = ", end="")
-        # print(decoded_token)
-
         return True, uid
     except _auth_utils.InvalidIdTokenError:
         # print("INVALID ID TOKEN")
@@ -69,7 +53,7 @@ def updateFieldDocument(fieldID,gateID):
         if (field_json[0]):
             return field_json[1], 200
         else:
-            return 500
+            return ("Internal Server Error", 500)
     except Exception as e:
         return f"An Error Occurred: {e}"
 
@@ -105,9 +89,9 @@ def updateNodeId():
             node_id = request.get_json()['nodeID']
 
             if (fbInter.updateNodeID(gate_id, node_id)):       
-                return jsonify({"success": True}), 200
+                return ("OK", 200)
             else: 
-                return jsonify({"success": False}), 500
+                return ("Internal Server Error", 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -119,9 +103,9 @@ def deleteField():
         try:
             fieldID = request.get_json()['fieldID']
             if (fbInter.deleteField(fieldID)):
-                return jsonify({"success": True}), 200
+                return ("OK", 200)
             else:
-                return jsonify({"success": False}, 500)
+                return ("Internal Server Error", 500)
         except Exception as e:
             return f"An Error Occurred : {e}"
     else:
@@ -138,7 +122,7 @@ def signUp():
         if (fbInter.initUser(check_auth(request)[1])):
             return jsonify({"success": True}), 200
         else:
-            return jsonify({"success": False}), 500
+            return ("Internal Server Error", 500)
     else:
         return ("FORBIDDEN", 403)
 
@@ -150,9 +134,9 @@ def signIn():
         try:
             userID = check_auth(request)[1]
             if (fbInter.activateUser(userID=userID)):
-                return jsonify({"success":True}), 200
+                return ("OK", 200)
             else:
-                return jsonify({"success": False}), 500
+                return ("Internal Server Error", 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -165,9 +149,9 @@ def signout():
         try:
             userID = check_auth(request)[1]
             if (fbInter.deactivateUser(userID=userID)):
-                return jsonify({"success":True}), 200
+                return ("OK", 200)
             else:
-                return jsonify({"success": False}), 500
+                return ("Internal Server Error", 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -182,7 +166,8 @@ def signout():
 # }
 @app.route("/addField", methods =['GET','POST'])
 def addField():
-    if (check_auth(request)[0]):
+    current_auth = check_auth(request)
+    if (current_auth[0]):
         try:
             firstGeopoint = request.get_json()['nw']
             secondGeopoint = request.get_json()['ne']
@@ -197,10 +182,15 @@ def addField():
             )
 
             if (new_field[0]):
-                fieldID = new_field[1]
-                return (jsonify({"success": fieldID}), 200)
+                fieldID = {
+                    "fieldID": new_field[1]
+                }
+
+                fbInter.updateUserField(new_field[1], current_auth[1])
+
+                return (jsonify(fieldID), 200)
             else:
-                return (jsonify({"success": False}), 500)
+                return "Internal Server Error", 500
             
             # user = check_auth(auth_token)[1]
         except Exception as e:
@@ -225,9 +215,9 @@ def setGateHeight():
                 gateID=gateID, 
                 newHeight=gateHeight)):
 
-                return jsonify({"success": True}), 200
+                return ("OK", 200)
             else:
-                return (jsonify({"success": False}), 500)
+                return ("Internal Server Error", 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -253,14 +243,15 @@ def addGates():
             new_gate = fbInter.createGate(
                 lat=lat,
                 long=long, 
+                fieldID=fieldID
             )
 
             if (new_gate[0]):
                 fbInter.updateField(fieldID, new_gate[1])
             
-                return (jsonify({"success": True}), 200)
+                return ("OK", 200)
             else:
-                return (jsonify({"success": False}), 500)
+                return ("Internal Server Error", 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:   
@@ -268,13 +259,18 @@ def addGates():
 
 @app.route("/getGates",methods = ['GET','POST'])
 def fetchGates():
-    if (check_auth(request)[0]):
+    current_auth = check_auth(request)
+    if (current_auth[0]):
         try:
-            gates = fbInter.fetchGates()
-            if (gates[0]):
-                return jsonify(gates[1])
+            gates = None
+            if (request.args.get('fieldID') != None):
+                gates = fbInter.fetchGates(current_auth[1], request.args.get('fieldID'))
             else:
-                return (jsonify({"success": False}), 500)
+                gates = fbInter.fetchGates(current_auth[1])
+            if (gates[0]):
+                return jsonify(gates[1]), 200
+            else:
+                return ("Internal Server Error", 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -282,18 +278,22 @@ def fetchGates():
     
 @app.route('/getField', methods=['GET','POST'])
 def getField():
-    if (check_auth(request)[0]):
+    current_auth = check_auth(request)
+    if (current_auth[0]):
         fieldID = ""
         if (request.method == "GET"):
             fieldID = request.args.get('fieldID')
         else:
             fieldID = request.get_json()['fieldID']
         try:
-            field_dict = fbInter.getField(fieldID=fieldID)
+            field_dict = fbInter.getField(fieldID=fieldID, userID=current_auth[1])
             if (field_dict[0]):        
                 return (jsonify(field_dict[1]), 200)
             else:
-                return (jsonify({"success": False}), 500)
+                if (field_dict[1]['response'] == 403):
+                    return ("FORBIDDEN", 403)
+                else:
+                    return ("Internal Server Error", 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -302,12 +302,13 @@ def getField():
 
 @app.route('/getFields', methods=['GET','POST'])
 def getFields(): 
-    if (check_auth(request)[0]):
+    current_auth = check_auth(request)
+    if (current_auth[0]):
         fieldResponse = []
         try:
-            fields = fbInter.fetchFields()
+            fields = fbInter.fetchFields(current_auth[1])
             if (fields[0]):
-                return jsonify(fields[1]), 200
+                return fields[1], 200
             else:
                 return (jsonify({"success": False}), 500)
         except Exception as e:
@@ -334,9 +335,9 @@ def adjustGateLocation():
                 lat=lat,
                 long=long
             )):
-                return jsonify({"success": True}), 200
+                return ("OK", 200)
             else:
-                return jsonify({"success": False}), 500
+                return ("Internal Server Error", 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     
@@ -357,7 +358,7 @@ def tileField():
             if (tiled_field[0]):
                 return jsonify(tiled_field[1]), 200      
             else:
-                return 500
+                return ("Internal Server Error", 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -384,9 +385,9 @@ def create():
                     title=to_do_title
                 )
             if (new_to_do[0]):
-                return jsonify({"success": True}), 200
+                return ("OK", 200)
             else:
-                return jsonify({"success": False}), 500
+                return ("Internal Server Error", 500)
         except Exception as e:
             print(e)
             return f"An Error Occurred: {e}"
@@ -413,7 +414,7 @@ def read():
             if (to_do[0]):
                 return jsonify(to_do), 200
             else:
-                return 500
+                return ("Internal Server Error", 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -433,9 +434,9 @@ def update():
             title = request.get_json()['title']
             
             if (fbInter.updateToDo(id, title)):
-                return jsonify({"success": True}), 200
+                return ("OK", 200)
             else:
-                return 500
+                return ("Internal Server Error", 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:
@@ -451,9 +452,9 @@ def delete():
             # Check for ID in URL query
             todo_id = request.args.get('id')
             if (fbInter.deleteToDo(todo_id)):
-                return jsonify({"success": True}), 200
+                return ("OK", 200)
             else:
-                return 500
+                return ("Internal Server Error", 500)
         except Exception as e:
             return f"An Error Occurred: {e}"
     else:

@@ -99,35 +99,66 @@ class FBInterface:
         except Exception:
             return False, ""
         
-    def fetchGates(self) -> tuple:
+    def fetchGates(self, userID, fieldID = -1) -> tuple:
+        print(fieldID)
         try:
             gates_json = {}
+            gates = []
 
-            gates = self.gates.stream()
-            for gate in gates:
-                gates_json[gate.id] = {
-                    "lat": gate.to_dict()["lat"],
-                    "long": gate.to_dict()["long"],
-                    "height": gate.to_dict()["height"],
-                    "nodeID": gate.to_dict()["nodeID"]
-                }
-            
-            return True, gates_json
+            if (fieldID == -1):
+                for field in self.users.document(userID).get().to_dict()['fields']:
+                    for gate in self.fields.document(field).get().to_dict()['gates']:
+                        gates.append(gate)
+
+                for gate in gates:
+                    current_gate = self.gates.document(gate).get().to_dict()
+
+                    gates_json[self.gates.document(gate).id] = {
+                        "lat": current_gate["lat"],
+                        "long": current_gate["long"],
+                        "height": current_gate["height"],
+                        "nodeID": current_gate["nodeID"]
+                    }
+                
+                return True, gates_json
+            else:
+                print(userID)
+                current_field = self.getField(fieldID, userID)[1]
+
+                print(current_field)
+
+                for gate in current_field['gates']:
+                    current_gate = self.gates.document(gate).get().to_dict()
+
+                    print(current_gate)
+
+                    gates_json[self.gates.document(gate).id] = {
+                        "lat": current_gate["lat"],
+                        "long": current_gate["long"],
+                        "height": current_gate["height"],
+                        "nodeID": current_gate["nodeID"]
+                    }
+
+                return True, gates_json
         except Exception:
             return False, {}
         
-    def getField(self, fieldID) -> tuple:
+    def getField(self, fieldID, userID) -> tuple:
         try:
-            return True, self.fields.document(fieldID).get().to_dict()
+            if (fieldID in self.users.document(userID).get().to_dict()['fields']):
+                return True, self.fields.document(fieldID).get().to_dict()
+            else:
+                return False, {"response": 403}
         except Exception:
-            return False, {}
+            return False, {"response": 500}
         
-    def fetchFields(self) -> tuple:
+    def fetchFields(self, userID) -> tuple:
         try:
-            fields_list = self.fields.stream()
-            id_list = [field.id for field in fields_list]
+            user_data = self.users.document(userID).get().to_dict()
+            fields = user_data['fields']
 
-            fields_json = json.dumps(id_list)
+            print(fields)
+            fields_json = json.dumps(fields)
             return True, fields_json
         except Exception:
             return False, {}
