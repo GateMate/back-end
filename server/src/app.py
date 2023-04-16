@@ -115,14 +115,13 @@ def deleteField():
 # }
 @app.route("/signup", methods =['GET','POST'])
 def signUp():
-    if (check_auth(request)[0]):
-        if (fbInter.initUser(check_auth(request)[1])):
-            return jsonify({"success": True}), 200
-        else:
-            return ("Internal Server Error", 500)
+    uid = request.get_json()['uid']
+    first_name = request.get_json()['first_name']
+    last_name = request.get_json()['last_name']
+    if (fbInter.initUser(uid, first_name, last_name)):
+        return jsonify({"success": True}), 200
     else:
-        return ("FORBIDDEN", 403)
-
+        return ("Internal Server Error", 500)
 #sample requestBody
 # {
 #     "nw":"36.0627|-94.1606",

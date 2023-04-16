@@ -1,4 +1,4 @@
-from firebase_admin import credentials, firestore, initialize_app, auth, _auth_utils, App
+from firebase_admin import credentials, firestore, initialize_app, App
 import google.cloud.firestore as gcfirestore
 import json
 import placement
@@ -10,7 +10,7 @@ class FBInterface:
     def __init__(self, credentials: credentials.Certificate):
         try:
             self.app: App = initialize_app(credential=credentials)
-            self.db : gcfirestore.Client = firestore.client()
+            self.db : gcfirestore.Client = firestore.client() 
 
             self.fields = self.db.collection('fields')
             self.gates = self.db.collection('gates')
@@ -184,10 +184,12 @@ class FBInterface:
         except Exception:
             return False, {}
     
-    def initUser(self, userID) -> bool:
+    def initUser(self, userID, firstName, lastName) -> bool:
         initial_user = {
             "fields":[],
-            "todos":[]
+            "todos":[],
+            "firstName": firstName,
+            "lastName": lastName
         }
         try:
             self.users.document(str(userID)).set(initial_user)
