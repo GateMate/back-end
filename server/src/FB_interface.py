@@ -242,7 +242,7 @@ class FBInterface:
 
         user.update({u'todos': firestore.ArrayUnion([str(todoID)])})
 
-    def createToDo(self, title, toDoID=-1):
+    def createToDo(self, title, user, toDoID=-1,):
         new_to_do = None
         if (toDoID == -1):       
             new_to_do = {
@@ -261,7 +261,7 @@ class FBInterface:
         except Exception:
             return False, ""
     
-    def getToDo(self, toDoID = -1) -> tuple:
+    def getToDo(self, toDoID = -1, user = -1) -> tuple:
         try:
             if (toDoID != -1):
                 return (
@@ -269,9 +269,14 @@ class FBInterface:
                     self.todos.document(toDoID).get().to_dict()
                 )
             else:
+                userTodos = set(self.users.document(user).get().to_dict()["todos"])
+                toDoList = []
+                for doc in self.todos.stream():
+                    if doc.id in userTodos:
+                        toDoList.append(doc.to_dict())
                 return (
                     True, 
-                    [doc.to_dict() for doc in self.todos.stream()]
+                    toDoList
                 )
         except Exception:
             return False, []
