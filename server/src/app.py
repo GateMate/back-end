@@ -376,7 +376,7 @@ def read():
                 to_do = fbInter.getToDo()
             
             if (to_do[0]):
-                return jsonify(to_do), 200
+                return jsonify(to_do[1]), 200
             else:
                 return ("Internal Server Error", 500)
         except Exception as e:
