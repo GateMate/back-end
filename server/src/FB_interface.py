@@ -176,10 +176,14 @@ class FBInterface:
         except:
             return False
         
-    def getFieldTiles(self, fieldID) -> tuple:
+    def getFieldTiles(self, fieldID, userID) -> tuple:
         try:
+            field = self.getField(fieldID=fieldID, userID=userID)
+
+            print(field)
+
             return (True, placement.tileField(
-                self.getField(fieldID=fieldID)[1]
+                field[1]
             ))
         except Exception:
             return False, {}

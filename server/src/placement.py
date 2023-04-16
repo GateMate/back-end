@@ -1,5 +1,4 @@
 import numpy as np
-import random
 import requests
 
 TILES_PER_FIELD_Y = 8
@@ -13,23 +12,7 @@ ELEVATION_ENDPOINT = "http://34.174.221.76"
 def closest(lst, K):
     return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
 
-#placeholder function for generating gate placements
-def generateGatePlacement(latitude, longitude, map: np.array):
-	print("here1")
-	gatePlacements = np.empty([4,3])
-	# gatePlacements.shape = (4, 3) #3 is what matters. 0=lat. 1=long. 2=extra info like maybe gate number
-	print("here2")
-	for x in range(0, 4):
-		latoff = random.uniform(-0.01, 0.01)
-		longoff = random.uniform(-0.01, 0.01)
-		gatePlacements[x, 0] = latitude+latoff
-		gatePlacements[x, 1] = longitude+longoff
-		gatePlacements[x, 2] = x
-	return gatePlacements
-
 def tileField(current_field: dict) -> dict:
-
-	current_field = {}
 
 	test_field : dict[str, str] = {
             'sw_point': "36.0627|-94.1606",

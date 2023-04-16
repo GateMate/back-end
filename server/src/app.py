@@ -1,7 +1,5 @@
 # Required imports
 import os
-import numpy as np
-import json
 from flask import Flask, request, jsonify
 from firebase_admin import credentials, auth, _auth_utils
 from weather_api import requestWeather
@@ -315,10 +313,11 @@ def adjustGateLocation():
 # }
 @app.route('/tile-field',methods=['GET', 'POST'])
 def tileField():
-    if (check_auth(request)[0]):
+    current_auth = check_auth(request)
+    if (current_auth[0]):
         try:
             field_id = request.get_json()["fieldID"]
-            tiled_field = fbInter.getFieldTiles(fieldID=field_id)
+            tiled_field = fbInter.getFieldTiles(fieldID=field_id, userID=current_auth[1])
 
             if (tiled_field[0]):
                 return jsonify(tiled_field[1]), 200      
