@@ -42,11 +42,20 @@ class FBInterface:
         except Exception:
             return False, {}
     
-    def deleteField(self, fieldID) -> bool:
+    def deleteField(self, fieldID, userID) -> bool:
         try:
             self.fields.document(fieldID).delete()
+
+            user = self.users.document(userID).get().to_dict()
+            user_fields = list(user['fields'])
+            
+            user_fields.remove(fieldID)
+            user['fields'] = user_fields
+
+            self.users.document(userID).update(user)
             return True
-        except Exception:
+        except Exception as e:
+            print(e)
             return False
     
     def createField(self, nwPoint, nePoint, swPoint, sePoint, name="") -> tuple:
@@ -242,7 +251,7 @@ class FBInterface:
 
         user.update({u'todos': firestore.ArrayUnion([str(todoID)])})
 
-    def createToDo(self, title, toDoID=-1):
+    def createToDo(self, title, userID, toDoID=-1):
         new_to_do = None
         if (toDoID == -1):       
             new_to_do = {
@@ -256,6 +265,8 @@ class FBInterface:
         try:
             to_add = self.todos.document()
             to_add.set(new_to_do)
+
+            self.updateUserTodo(userID, to_add.id)
 
             return True, to_add.id
         except Exception:
@@ -288,12 +299,21 @@ class FBInterface:
         except Exception:
             return False
         
-    def deleteToDo(self, toDoID) -> bool:
+    def deleteToDo(self, toDoID, userID) -> bool:
         try:
             self.todos.document(toDoID).delete()
 
+            user = self.users.document(userID).get().to_dict()
+            user_todos = list(user['todos'])
+            
+            user_todos.remove(toDoID)
+            user['todos'] = user_todos
+
+            self.users.document(userID).update(user)
+
             return True
-        except Exception:
+        except Exception as e:
+            print(e)
             return False
 
 

@@ -94,10 +94,11 @@ def updateNodeId():
 
 @app.route("/deleteField",methods = ['GET','POST'])
 def deleteField():
-    if (check_auth(request)[0]):
+    current_auth = check_auth(request)
+    if (current_auth[0]):
         try:
             fieldID = request.get_json()['fieldID']
-            if (fbInter.deleteField(fieldID)):
+            if (fbInter.deleteField(fieldID, current_auth[1])):
                 return ("OK", 200)
             else:
                 return ("Internal Server Error", 500)
@@ -335,21 +336,24 @@ def create():
         Ensure you pass a custom ID as part of json body in post request,
         e.g. json={'id': '1', 'title': 'Write a blog post,}
     """
-    # currentUser = getActiveUser()
+    current_auth = check_auth(request)
     if (check_auth(request)[0]):  
         try:
             to_do_title = request.get_json()['title']
             try:
                 to_do_id = request.get_json()['id']
                 new_to_do = fbInter.createToDo(
-                    title=to_do_title, toDoID=to_do_id
+                    title=to_do_title, 
+                    toDoID=to_do_id,
+                    userID=current_auth[1]
                 )
             except KeyError:
                 new_to_do = fbInter.createToDo(
-                    title=to_do_title
+                    title=to_do_title,
+                    userID=current_auth[1]
                 )
             if (new_to_do[0]):
-                return ("OK", 200)
+                return (jsonify({"id":new_to_do[1]}), 200)
             else:
                 return ("Internal Server Error", 500)
         except Exception as e:
@@ -411,11 +415,12 @@ def delete():
     """
         delete() : Delete a document from Firestore collection.
     """
-    if (check_auth(request)[0]):
+    current_auth = check_auth(request)
+    if (current_auth[0]):
         try:
             # Check for ID in URL query
             todo_id = request.args.get('id')
-            if (fbInter.deleteToDo(todo_id)):
+            if (fbInter.deleteToDo(todo_id, current_auth[1])):
                 return ("OK", 200)
             else:
                 return ("Internal Server Error", 500)
