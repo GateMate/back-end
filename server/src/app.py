@@ -353,7 +353,7 @@ def create():
                     userID=current_auth[1]
                 )
             if (new_to_do[0]):
-                return (jsonify({"id":new_to_do[1]}), 200)
+                return (jsonify({"id":new_to_do[1]}), 201)
             else:
                 return ("Internal Server Error", 500)
         except Exception as e:
