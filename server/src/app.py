@@ -369,15 +369,16 @@ def read():
         todo : Return document that matches query ID.
         all_todos : Return all documents.
     """
-    if (check_auth(request)[0]):  
+    current_auth = check_auth(request)
+    if (current_auth[0]):  
         try:
             # Check if ID was passed to URL query
             todo_id = request.args.get('id')
             to_do = None
-            if todo_id:
-                to_do = fbInter.getToDo(toDoID=todo_id)
+            if todo_id != "-1":
+                to_do = fbInter.getToDo(toDoID=todo_id, user=current_auth[1])
             else:
-                to_do = fbInter.getToDo()
+                to_do = fbInter.getToDo(user=current_auth[1])
             
             if (to_do[0]):
                 return jsonify(to_do[1]), 200

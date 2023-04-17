@@ -272,13 +272,22 @@ class FBInterface:
         except Exception:
             return False, ""
     
-    def getToDo(self, toDoID = -1, user = -1) -> tuple:
+    def getToDo(self, user, toDoID = None) -> tuple:
         try:
-            if (toDoID != -1):
-                return (
-                    True, 
-                    self.todos.document(toDoID).get().to_dict()
-                )
+            if (toDoID != None):
+                print("IN IF")
+                userTodos = set(self.users.document(user).get().to_dict()["todos"])
+
+                if (toDoID in userTodos):
+                    return (
+                        True, 
+                        self.todos.document(toDoID).get().to_dict()
+                    )
+                else:
+                    return (
+                        False,
+                        {}
+                    )
             else:
                 userTodos = set(self.users.document(user).get().to_dict()["todos"])
                 toDoList = []
@@ -289,7 +298,8 @@ class FBInterface:
                     True, 
                     toDoList
                 )
-        except Exception:
+        except Exception as e:
+            print(e)
             return False, []
         
     def updateToDo(self, toDoID, title) -> bool:
