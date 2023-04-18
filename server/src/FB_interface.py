@@ -115,19 +115,24 @@ class FBInterface:
             gates = []
 
             if (fieldID == -1):
-                for field in self.users.document(userID).get().to_dict()['fields']:
-                    for gate in self.fields.document(field).get().to_dict()['gates']:
-                        gates.append(gate)
+                userFields = self.users.document(userID).get().to_dict()['fields']
 
-                for gate in gates:
-                    current_gate = self.gates.document(gate).get().to_dict()
+                for field in userFields:
+                    gates.append(self.fields.document(field).get().to_dict()['gates'])
 
-                    gates_json[self.gates.document(gate).id] = {
-                        "lat": current_gate["lat"],
-                        "long": current_gate["long"],
-                        "height": current_gate["height"],
-                        "nodeID": current_gate["nodeID"]
-                    }
+                if (len(gates[0]) == 0):
+                    return True, {}
+
+                for field_gates in gates:
+                    for field_gate in field_gates:
+                        current_gate = self.gates.document(field_gate).get().to_dict()
+
+                        gates_json[self.gates.document(field_gate).id] = {
+                            "lat": current_gate["lat"],
+                            "long": current_gate["long"],
+                            "height": current_gate["height"],
+                            "nodeID": current_gate["nodeID"]
+                        }
                 
                 return True, gates_json
             else:
@@ -149,7 +154,8 @@ class FBInterface:
                     }
 
                 return True, gates_json
-        except Exception:
+        except Exception as e:
+            print(e)
             return False, {}
         
     def getField(self, fieldID, userID) -> tuple:
