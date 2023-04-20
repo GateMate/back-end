@@ -160,9 +160,12 @@ class FBInterface:
         
     def deleteGate(self, gateID, userID) -> bool:
         try:
+            print("IN DELTE")
             self.gates.document(gateID).delete()
 
             fields = self.fields.stream()
+
+            print("BEFORE GETTING FIELD")
             
             updated_field = {}
             field_id = str(-1)
@@ -171,13 +174,23 @@ class FBInterface:
                 if gateID in field_data['gates']:
                     field_id = field.id
                     updated_field = field.to_dict()
-            
-            list(updated_field['gates']).remove(gateID)
 
-            print(updated_field)
+            if (field_id != "-1"):
+                print("After getting field")
 
-            # self.users.document(fields).update(updated_field)
-            return True
+                gate_list = list(updated_field['gates'])
+                gate_list.remove(gateID)
+
+                print(gate_list)
+
+                print("field_id = " + str(field_id))
+                
+                updated_field['gates'] = gate_list
+
+                print(updated_field)
+
+                self.fields.document(field_id).update(updated_field)
+                return True
         except Exception as e:
             print(e)
             return False
