@@ -110,6 +110,7 @@ class FBInterface:
         
     def fetchGates(self, userID, fieldID = -1) -> tuple:
         print(fieldID)
+        print(type(fieldID))
         try:
             gates_json = {}
             gates = []
@@ -120,12 +121,18 @@ class FBInterface:
                 for field in userFields:
                     gates.append(self.fields.document(field).get().to_dict()['gates'])
 
+                print("BEFORE GATE LENGTH CHECK")
+
                 if (len(gates[0]) == 0):
                     return True, {}
+                
+                print("AFTER THAT THING")
 
                 for field_gates in gates:
                     for field_gate in field_gates:
                         current_gate = self.gates.document(field_gate).get().to_dict()
+
+                        print(current_gate)
 
                         gates_json[self.gates.document(field_gate).id] = {
                             "lat": current_gate["lat"],
@@ -133,6 +140,8 @@ class FBInterface:
                             "height": current_gate["height"],
                             "nodeID": current_gate["nodeID"]
                         }
+
+                print("BEFORE RETURN")
                 
                 return True, gates_json
             else:

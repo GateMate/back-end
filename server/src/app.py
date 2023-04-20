@@ -338,7 +338,7 @@ def create():
         e.g. json={'id': '1', 'title': 'Write a blog post,}
     """
     current_auth = check_auth(request)
-    if (check_auth(request)[0]):  
+    if (check_auth(request)[0]):
         try:
             to_do_title = request.get_json()['title']
             try:
