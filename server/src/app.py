@@ -240,6 +240,21 @@ def fetchGates():
     else:
         return ("FORBIDDEN", 403)
     
+@app.route("/deleteGate",methods = ['DELETE'])
+def deleteGate():
+    current_auth = check_auth(request)
+    if (current_auth[0]):
+        try:
+            gateID = request.args.get('gateID')
+            if (fbInter.deleteGate(gateID, current_auth[1])):
+                return ("OK", 200)
+            else:
+                return ("Internal Server Error", 500)
+        except Exception as e:
+            return f"An Error Occurred : {e}"
+    else:
+        return ("FORBIDDEN", 403)
+    
 @app.route('/getField', methods=['GET','POST'])
 def getField():
     current_auth = check_auth(request)

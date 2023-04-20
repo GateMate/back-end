@@ -158,6 +158,22 @@ class FBInterface:
             print(e)
             return False, {}
         
+    def deleteGate(self, gateID, userID) -> bool:
+        try:
+            self.gates.document(gateID).delete()
+
+            user = self.users.document(userID).get().to_dict()
+            user_fields = list(user['fields'])
+            
+            user_fields.remove(gateID)
+            user['fields'] = user_fields
+
+            self.users.document(userID).update(user)
+            return True
+        except Exception as e:
+            print(e)
+            return False
+        
     def getField(self, fieldID, userID) -> tuple:
         try:
             if (fieldID in self.users.document(userID).get().to_dict()['fields']):
