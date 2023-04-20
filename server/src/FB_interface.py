@@ -115,19 +115,24 @@ class FBInterface:
             gates = []
 
             if (fieldID == -1):
-                for field in self.users.document(userID).get().to_dict()['fields']:
-                    for gate in self.fields.document(field).get().to_dict()['gates']:
-                        gates.append(gate)
+                userFields = self.users.document(userID).get().to_dict()['fields']
 
-                for gate in gates:
-                    current_gate = self.gates.document(gate).get().to_dict()
+                for field in userFields:
+                    gates.append(self.fields.document(field).get().to_dict()['gates'])
 
-                    gates_json[self.gates.document(gate).id] = {
-                        "lat": current_gate["lat"],
-                        "long": current_gate["long"],
-                        "height": current_gate["height"],
-                        "nodeID": current_gate["nodeID"]
-                    }
+                if (len(gates[0]) == 0):
+                    return True, {}
+
+                for field_gates in gates:
+                    for field_gate in field_gates:
+                        current_gate = self.gates.document(field_gate).get().to_dict()
+
+                        gates_json[self.gates.document(field_gate).id] = {
+                            "lat": current_gate["lat"],
+                            "long": current_gate["long"],
+                            "height": current_gate["height"],
+                            "nodeID": current_gate["nodeID"]
+                        }
                 
                 return True, gates_json
             else:
@@ -149,8 +154,46 @@ class FBInterface:
                     }
 
                 return True, gates_json
-        except Exception:
+        except Exception as e:
+            print(e)
             return False, {}
+        
+    def deleteGate(self, gateID, userID) -> bool:
+        try:
+            print("IN DELTE")
+            self.gates.document(gateID).delete()
+
+            fields = self.fields.stream()
+
+            print("BEFORE GETTING FIELD")
+            
+            updated_field = {}
+            field_id = str(-1)
+            for field in fields:
+                field_data = field.to_dict()
+                if gateID in field_data['gates']:
+                    field_id = field.id
+                    updated_field = field.to_dict()
+
+            if (field_id != "-1"):
+                print("After getting field")
+
+                gate_list = list(updated_field['gates'])
+                gate_list.remove(gateID)
+
+                print(gate_list)
+
+                print("field_id = " + str(field_id))
+                
+                updated_field['gates'] = gate_list
+
+                print(updated_field)
+
+                self.fields.document(field_id).update(updated_field)
+                return True
+        except Exception as e:
+            print(e)
+            return False
         
     def getField(self, fieldID, userID) -> tuple:
         try:
