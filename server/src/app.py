@@ -240,7 +240,7 @@ def fetchGates():
     else:
         return ("FORBIDDEN", 403)
     
-@app.route("/deleteGate",methods = ['DELETE'])
+@app.route("/deleteGate", methods = ['DELETE'])
 def deleteGate():
     current_auth = check_auth(request)
     if (current_auth[0]):

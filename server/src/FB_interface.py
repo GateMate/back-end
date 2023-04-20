@@ -162,13 +162,21 @@ class FBInterface:
         try:
             self.gates.document(gateID).delete()
 
-            user = self.users.document(userID).get().to_dict()
-            user_fields = list(user['fields'])
+            fields = self.fields.stream()
             
-            user_fields.remove(gateID)
-            user['fields'] = user_fields
+            updated_field = {}
+            field_id = str(-1)
+            for field in fields:
+                field_data = field.to_dict()
+                if gateID in field_data['gates']:
+                    field_id = field.id
+                    updated_field = field.to_dict()
+            
+            list(updated_field['gates']).remove(gateID)
 
-            self.users.document(userID).update(user)
+            print(updated_field)
+
+            # self.users.document(fields).update(updated_field)
             return True
         except Exception as e:
             print(e)
