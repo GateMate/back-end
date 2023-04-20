@@ -137,12 +137,14 @@ def addField():
             secondGeopoint = request.get_json()['ne']
             thirdGeopoint = request.get_json()['sw']
             fourthGeopoint = request.get_json()['se']
+            fieldName = request.get_json()['fieldName']
 
             new_field = fbInter.createField(
                 firstGeopoint,
                 secondGeopoint,
                 thirdGeopoint,
-                fourthGeopoint
+                fourthGeopoint,
+                fieldName,
             )
 
             if (new_field[0]):
