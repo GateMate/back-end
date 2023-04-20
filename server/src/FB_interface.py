@@ -337,6 +337,9 @@ class FBInterface:
                 for doc in self.todos.stream():
                     if doc.id in userTodos:
                         toDoList.append(doc.to_dict())
+                
+                print(toDoList)
+
                 return (
                     True, 
                     toDoList
