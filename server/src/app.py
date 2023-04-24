@@ -239,7 +239,8 @@ def fetchGates():
             return f"An Error Occurred: {e}"
     else:
         return ("FORBIDDEN", 403)
-    
+
+# Endpoint for deleting gates github please realize there are changes.
 @app.route("/deleteGate", methods = ['GET', 'DELETE'])
 def deleteGate():
     current_auth = check_auth(request)
