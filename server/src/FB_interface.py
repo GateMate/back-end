@@ -96,7 +96,7 @@ class FBInterface:
                 "lat": lat,
                 "long": long,
                 "nodeID": nodeID,
-                "height": height
+                "height": str(height)
             }
 
             new_gate.set(gate_json)
@@ -121,9 +121,16 @@ class FBInterface:
                 for field in userFields:
                     gates.append(self.fields.document(field).get().to_dict()['gates'])
 
+                print(gates)
+
                 print("BEFORE GATE LENGTH CHECK")
 
-                if (len(gates[0]) == 0):
+                no_gates = True
+                for gate_list in gates:
+                    if (len(gate_list) != 0):
+                        no_gates = False
+                
+                if no_gates:
                     return True, {}
                 
                 print("AFTER THAT THING")
